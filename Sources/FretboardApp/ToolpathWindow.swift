@@ -147,6 +147,14 @@ struct ToolpathTopBar: View {
                 LedReadout(text: GCodeWriter.formatTime(path.totalTime))
                 LedReadout(text: "\(path.moves.count) MOVES", color: Theme.haze)
             }
+            LatchButton(title: "← DESIGNER", on: false, height: 22) {
+                let toolpathWindow = NSApp.keyWindow
+                toolpathWindow?.close()
+                NSApp.windows.first { $0 !== toolpathWindow && $0.canBecomeMain && $0.isVisible }?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            .frame(width: 110)
+            .help("Close the toolpath window and return to the designer")
         }
         .padding(.horizontal, 14)
         .frame(height: 38)
