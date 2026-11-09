@@ -65,3 +65,6 @@ DYLD_LIBRARY_PATH=$U swift test -Xswiftc -F$F -Xlinker -F$F -Xlinker -rpath -Xli
 - `Tests/FretboardKitTests` – geometry, mesh, toolpath and template tests
 - `docs/` – user guide (PDF + HTML source) and screenshots
 - `tools/make_icon.swift` – renders the app icon (`Resources/AppIcon.icns`)
+
+## License
+Released under the [MIT License](LICENSE). The software is provided as-is, with no warranty: always check generated G-code against your own machine and dry-run above the stock before cutting.
