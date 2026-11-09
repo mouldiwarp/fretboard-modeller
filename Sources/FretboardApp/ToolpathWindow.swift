@@ -173,7 +173,10 @@ struct CNCSettingsPanel: View {
                 NumberField(title: "Flat end mill", value: $tp.settings.cutterDiameter)
                 NumberField(title: "Blank length", value: $tp.settings.stockLength)
                 NumberField(title: "Blank width", value: $tp.settings.stockWidth)
-                NumberField(title: "Blank thickness", value: $tp.settings.stockThickness)
+                NumberField(title: "Min. blank thickness", value: $tp.settings.stockThickness)
+                Text(String(format: "Needs at least %.1f mm (board %.1f + %.1f left + 0.5 mm) so there is a roughing pass to cut. Thickness the blank beforehand to about this.",
+                            tp.settings.minimumStockThickness(for: store.params), store.params.thickness, tp.settings.roughAllowance))
+                    .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
                 NumberField(title: "Heel edge from blank end", value: $tp.settings.stockHeelMargin)
                 Text(String(format: "Nut end: %.1f mm of blank beyond the board. Blank is centred on the board's centre line.",
                             tp.settings.stockMaxX - FretboardLayout(store.params).xEnd))

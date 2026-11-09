@@ -65,6 +65,11 @@ public struct CNCSettings: Equatable, Sendable {
         return (0..<n).map { dOut - (dOut - dIn) * Double($0) / Double(n - 1) }
     }
 
+    /// Thinnest blank that still needs a roughing pass: board thickness + material left + a 0.5 mm cut.
+    public func minimumStockThickness(for params: FretboardParameters) -> Double {
+        params.thickness + roughAllowance + 0.5
+    }
+
     public func validate(for params: FretboardParameters) -> [String] {
         var e: [String] = []
         if cutterDiameter <= 0 { e.append("Cutter diameter must be positive.") }
@@ -74,8 +79,8 @@ public struct CNCSettings: Equatable, Sendable {
         if !(0..<1).contains(roughOverlap) || !(0..<1).contains(finishOverlap) {
             e.append("Overlaps must be between 0% and 99%.")
         }
-        if stockThickness < params.thickness + roughAllowance + 0.5 {
-            e.append("Stock must be at least \(String(format: "%.1f", params.thickness + roughAllowance + 0.5)) mm thick.")
+        if stockThickness < minimumStockThickness(for: params) - 1e-9 {
+            e.append("Blank must be at least \(String(format: "%.1f", minimumStockThickness(for: params))) mm thick so there is a roughing pass to cut.")
         }
         if safeZ <= 0 { e.append("Safe Z must be above the stock top.") }
         if trenchWidthFactor < 1 { e.append("Trench width must be at least one cutter diameter.") }

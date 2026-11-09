@@ -276,3 +276,14 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     }
     #expect(worst < 0.07)
 }
+
+@Test func blankMustLeaveARoughingPass() {
+    let p = FretboardParameters()
+    var s = CNCSettings()
+    let m = s.minimumStockThickness(for: p)
+    #expect(abs(m - (p.thickness + s.roughAllowance + 0.5)) < 1e-9)
+    s.stockThickness = m - 0.1
+    #expect(!s.validate(for: p).isEmpty)
+    s.stockThickness = m
+    #expect(s.validate(for: p).isEmpty)
+}
