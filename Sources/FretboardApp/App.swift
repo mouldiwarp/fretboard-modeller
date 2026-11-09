@@ -31,6 +31,12 @@ struct FretboardApp: App {
                 .environmentObject(toolpath)
         }
         .defaultSize(width: 1380, height: 860)
+
+        Window("Fret Template", id: "template") {
+            FretTemplateWindow()
+                .environmentObject(store)
+        }
+        .defaultSize(width: 1180, height: 700)
     }
 }
 

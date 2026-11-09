@@ -86,6 +86,7 @@ struct BottomBar: View {
             Spacer()
             Text("Drag to orbit · ⌘ + scroll or pinch to zoom · click two points to measure")
                 .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
+            BigLampButton(title: "FRET TEMPLATE", systemImage: "ruler", tint: Theme.haze, lit: false) { openWindow(id: "template") }
             BigLampButton(title: "TOOLPATH", systemImage: "scope", tint: Theme.haze, lit: false,
                           enabled: store.errors.isEmpty) { openWindow(id: "toolpath") }
             BigLampButton(title: "EXPORT STL", systemImage: "square.and.arrow.up",

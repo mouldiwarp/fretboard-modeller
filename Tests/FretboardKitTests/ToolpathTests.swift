@@ -287,3 +287,16 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     s.stockThickness = m
     #expect(s.validate(for: p).isEmpty)
 }
+
+@Test func fretTemplateMatchesTheStandaloneApp() {
+    let marks = FretTemplate.positions(scaleLength: 25.5 * 25.4, fretCount: 24)
+    #expect(marks.count == 25)
+    #expect(marks[0].distanceFromNut == 0)
+    #expect(abs(marks[12].distanceFromNut - 12.75 * 25.4) < 1e-9)
+    #expect(abs(marks[24].distanceFromNut - 19.125 * 25.4) < 1e-9)
+    #expect(abs(marks[1].distanceFromNut - 36.353) < 1e-3)
+    let g = FretTemplate.gcode(scaleLength: 25.5 * 25.4, marks: marks, settings: .init())
+    #expect(g.contains("G21\nG90\n") && g.hasSuffix("M30\n"))
+    #expect(!g.contains("M3 ") && !g.contains("M5"))
+    #expect(g.contains("(Fret 1)\nG0 Z5.000\nG0 X36.353 Y0.000\nG1 Z-6.000 F200.000"))
+}
