@@ -61,7 +61,7 @@ struct ModelViewer: NSViewRepresentable {
         let view = ZoomSCNView()
         let scene = SCNScene()
         view.scene = scene
-        view.backgroundColor = NSColor(calibratedWhite: 0.13, alpha: 1)
+        view.backgroundColor = NSColor(srgbRed: 0x0A / 255, green: 0x0A / 255, blue: 0x0A / 255, alpha: 1)
         view.allowsCameraControl = true
         view.antialiasingMode = .multisampling4X
         view.autoenablesDefaultLighting = false
@@ -242,7 +242,7 @@ struct ModelViewer: NSViewRepresentable {
         }
 
         func addDimensions(_ L: FretboardLayout) {
-            let col = NSColor(calibratedRed: 0.35, green: 0.85, blue: 1.0, alpha: 1)
+            let col = NSColor(srgbRed: 0xC5 / 255, green: 0xA0 / 255, blue: 0x59 / 255, alpha: 1)   // gold
             let hwMax = L.taperHalfWidth(at: L.cornerTangentX)
             var segs: [(SIMD3<Double>, SIMD3<Double>)] = []
 
@@ -270,7 +270,7 @@ struct ModelViewer: NSViewRepresentable {
 
         func frame(preset: ViewPreset, layout L: FretboardLayout) {
             let center = SIMD3<Double>(L.xEnd / 2, 0, 3)
-            let d = max(L.xEnd, 120) * 1.7
+            let d = max(L.xEnd, 120) * 1.35
             let dir: SIMD3<Double>
             let upModel: SIMD3<Double>
             switch preset {
@@ -307,7 +307,7 @@ struct ModelViewer: NSViewRepresentable {
 
         func updatePicks(_ picks: [SIMD3<Double>]) {
             pickNode.childNodes.forEach { $0.removeFromParentNode() }
-            let col = NSColor.systemYellow
+            let col = NSColor(srgbRed: 1.0, green: 0xB5 / 255, blue: 0x4A / 255, alpha: 1)   // amber
             for p in picks {
                 let s = SCNSphere(radius: 0.8)
                 let m = SCNMaterial(); m.diffuse.contents = col; m.emission.contents = col; m.lightingModel = .constant

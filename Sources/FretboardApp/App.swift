@@ -20,9 +20,8 @@ struct FretboardApp: App {
         WindowGroup("Fretboard Modeller") {
             ContentView()
                 .environmentObject(store)
-                .frame(minWidth: 1100, minHeight: 700)
         }
-        .defaultSize(width: 1500, height: 850)
+        .defaultSize(width: 1380, height: 880)
     }
 }
 
