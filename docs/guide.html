@@ -1,0 +1,96 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Fretboard Modeller – User Guide</title>
+<style>
+@page{size:A4;margin:16mm 15mm}
+body{font-family:-apple-system,Helvetica,Arial,sans-serif;color:#1d1d1f;font-size:10.5pt;line-height:1.45}
+h1{font-size:26pt;margin:0 0 2mm;color:#8a6a1f}h2{font-size:16pt;margin:8mm 0 2mm;color:#8a6a1f;border-bottom:1.5px solid #c5a059;padding-bottom:1mm;break-after:avoid}
+h3{font-size:12pt;margin:5mm 0 1mm;break-after:avoid}
+img{width:100%;border:1px solid #ccc;border-radius:6px;margin:3mm 0;break-inside:avoid}
+table{border-collapse:collapse;width:100%;margin:2mm 0;break-inside:avoid}td,th{border:1px solid #d0d0d0;padding:1.5mm 2.5mm;text-align:left;vertical-align:top;font-size:9.5pt}th{background:#f3ecd9}
+code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
+.note{background:#fbf5e4;border-left:3px solid #c5a059;padding:2mm 3mm;margin:3mm 0;break-inside:avoid}
+.pb{break-before:page}.sub{color:#666;font-size:11pt}
+</style></head><body>
+<h1>Fretboard Modeller</h1><div class="sub">User guide – design a fretboard, machine it, and cut the fret slots</div>
+
+<h2>1. Overview</h2>
+<p>Fretboard Modeller has three tools that share one set of board dimensions:</p>
+<table><tr><th>Tool</th><th>Opened from</th><th>Produces</th></tr>
+<tr><td><b>Designer</b></td><td>Main window</td><td>3D fretboard, measurements, binary <code>.stl</code> (mm)</td></tr>
+<tr><td><b>Toolpath</b></td><td>TOOLPATH button</td><td>WorkBee Z1+ G-code (<code>.nc</code>) with animated playback</td></tr>
+<tr><td><b>Fret Template</b></td><td>FRET TEMPLATE button</td><td>Marker-hole G-code for the chop-saw fret slot jig</td></tr></table>
+<p>Launch it from Spotlight (⌘ Space, “Fretboard Modeller”) after running <code>./make_app.sh</code>. Both secondary windows have a <b>← DESIGNER</b> button that closes them and returns you to the main window.</p>
+
+<h2>2. Designer</h2>
+<img src="img/designer.png">
+<h3>Inputs</h3>
+<table><tr><th>Field</th><th>Meaning</th></tr>
+<tr><td>Scale length</td><td>In mm; the inch equivalent is shown, and PRESETS offers common scales.</td></tr>
+<tr><td>Frets</td><td>Number of frets (1–36).</td></tr>
+<tr><td>At nut / at last fret</td><td>Board width at the nut and at the last fret; the board tapers linearly between them.</td></tr>
+<tr><td>Nut thickness</td><td>Extra length added past the nut at the narrow end (default 0 mm).</td></tr>
+<tr><td>Surface radius</td><td>Radius in inches at the first and last fret. Equal values = constant radius; different values = compound radius.</td></tr>
+<tr><td>Max thickness</td><td>Thickness on the centre line (7 mm default). With a compound radius the centre-line thickness stays constant and the edges get thinner toward the wide end.</td></tr>
+<tr><td>Corner diameter</td><td>Rounding of the two wide-end corners (9.5 mm default). The narrow end has hard corners.</td></tr>
+<tr><td>Extension past last fret</td><td>The board always extends at least 9 mm beyond the last fret.</td></tr>
+<tr><td>Spoke-wheel truss rod</td><td>On by default. Adds a cutout centred on the heel edge: width 20 mm, depth 5 mm, inside corner radius 3 mm (all editable).</td></tr></table>
+<h3>Orientation</h3>
+<p>The widest end (heel) sits at X = 0; the narrowest end points toward +X. Y is across the board, centred on 0. Z is up, with the bottom of the board at Z = 0.</p>
+<h3>Viewer and measurements</h3>
+<ul><li>Drag to orbit; ⌘ + scroll or pinch (Magic Mouse / trackpad) to zoom.</li>
+<li>Buttons along the bottom set 3D, TOP, SIDE, HEEL END and NUT END views and toggle fret lines and dimension lines.</li>
+<li>Click two points on the board for a point-to-point distance.</li>
+<li>The right panel shows overall length, widths, edge thicknesses, radii, volume, bounding box and triangle count; SHOW TABLE lists every fret position.</li></ul>
+<h3>Exporting</h3>
+<p>EXPORT STL writes a binary STL in millimetres. The mesh is checked to be watertight before export is allowed; if a setting is invalid the status badge turns red and tells you why.</p>
+
+<h2 class="pb">3. Toolpath (CNC)</h2>
+<img src="img/toolpath.png">
+<p>Press <b>TOOLPATH</b> to open the toolpath window. Set the blank and options on the left, press <b>GENERATE</b>, review the run in the viewer, then <b>EXPORT</b> to save the G-code. The status badge shows <i>OUT OF DATE</i> if you change the board after generating – generate again before exporting.</p>
+<h3>Coordinate system</h3>
+<p>X0 = heel edge of the board, Y0 = board centre line, <b>Z0 = top of the blank</b>. The bottom of the board is the bottom of the blank. Cutter: 6 mm flat end mill. Set these work offsets on the machine before running.</p>
+<h3>Blank</h3>
+<table><tr><th>Setting</th><th>Notes</th></tr>
+<tr><td>Blank length / width</td><td>Defaults 520 × 80 mm. The blank is centred on the board's centre line.</td></tr>
+<tr><td>Min. blank thickness</td><td>Default 12 mm. Must be at least board thickness + material left + 0.5 mm (8.0 mm for the default 7 mm board) so there is at least one roughing pass. Thickness blanks beforehand to about this value.</td></tr>
+<tr><td>Heel edge from blank end</td><td>Default 20 mm; the nut-end margin is calculated and shown.</td></tr></table>
+<div class="note">The path is clipped to the blank and the app rejects a blank that cannot contain the board (1 mm all round). An amber warning appears if the blank is too tight for the outline trench.</div>
+<h3>Sequence</h3>
+<ol><li><b>Rough surface</b> – raster passes across the board width, running past the board edges, 1.5 mm deep, leaving 0.5 mm, 20 % overlap.</li>
+<li><b>Rough outline</b> – a trench round the board 1.5× the cutter width wide, cut as two loops on every depth layer: the outer loop first and the loop beside the board last, so the board edge gets the lightest cut. Leaves 0.5 mm on the edge and floor.</li>
+<li><b>Finish surface</b> – 50 % overlap, removing the last 0.5 mm.</li>
+<li><b>Finish outline</b> – full-depth cut round the board, leaving tabs.</li></ol>
+<p>The order (surfaces and trench first, final outline last) is chosen to reduce splitting.</p>
+<h3>Tabs and outline direction</h3>
+<ul><li><b>Tabs</b> hold the board in the blank on the final cut: default 4, each 5 mm wide and 1.5 mm tall. Cut them away by hand afterwards. Set tabs to 0 if you hold the blank down some other way (tape and superglue work as double-sided tape).</li>
+<li><b>Climb (CCW)</b> or <b>Conventional (CW)</b> sets the outline direction. If you see splits on one side of the board, switch direction.</li></ul>
+<h3>Feeds</h3>
+<p>X/Y cutting 1000 mm/min, Z cutting 800 mm/min. <b>Fast travel defaults to 2500 mm/min as a placeholder – set it to your machine's configured maximum.</b> Spindle RPM 0 means manual spindle control (no M3/M5 written).</p>
+<h3>Playback</h3>
+<p>Play the run at 1×, 10×, 50×, 200× or 1000× with the slider; the cutter and live X/Y/Z/feed readout follow the path. Views: 3D / TOP / SIDE; toggle RAPIDS and BOARD. Path colours: gold = rough surface, amber = rough outline, blue = finish surface, green = finish outline. Playback shows the cutter path, not material removal.</p>
+<h3>G-code format</h3>
+<p>Duet / RepRapFirmware: <code>G21</code>, <code>G90</code>, <code>G17</code>, explicit <code>G0</code>/<code>G1</code> with feed rates, header comments describing the job, and a section comment per operation. Check the output against your machine's configuration before the first run, and test above the stock.</p>
+
+<h2 class="pb">4. Fret Template</h2>
+<img src="img/template.png">
+<p>Creates the drilled-hole template used to position a jig for cutting fret slots on a chop saw. Fret positions come from <code>d = L · (1 − 1/2<sup>n/12</sup>)</code>, measured from the nut. Fret 0 is X0 and all holes lie on Y0.</p>
+<table><tr><th>Setting</th><th>Default</th></tr>
+<tr><td>Scale length / frets</td><td>Taken from the designer; <b>USE DESIGNER VALUES</b> resets them</td></tr>
+<tr><td>Hole diameter</td><td>4 mm (written as a comment only – drill with a 4 mm bit)</td></tr>
+<tr><td>Plunge depth</td><td>6 mm</td></tr>
+<tr><td>Safe Z</td><td>5 mm</td></tr>
+<tr><td>Feed</td><td>200 mm/min</td></tr>
+<tr><td>Comments</td><td>( ) or ; style</td></tr></table>
+<p>The table lists each fret's distance from the nut and spacing from the previous fret; the preview shows the G-code. <b>EXPORT G-CODE</b> saves <code>fret-slot-template-&lt;scale in&gt;-&lt;frets&gt;.nc</code>. The output is GRBL-style (ends with <code>M30</code>) and has no spindle commands, so run the drill by hand. Holes are at the fret centrelines; no blade-kerf offset is applied.</p>
+
+<h2>5. Building and testing</h2>
+<table><tr><td><code>./make_app.sh</code></td><td>Builds the release app and installs it to ~/Applications (Spotlight-launchable).</td></tr>
+<tr><td><code>swift run FretboardApp</code></td><td>Runs from the command line.</td></tr>
+<tr><td><code>swift test</code></td><td>Runs the test suite (see the README for the Command-Line-Tools-only flags).</td></tr></table>
+<h2>6. Troubleshooting</h2>
+<table><tr><th>Symptom</th><th>Fix</th></tr>
+<tr><td>Status badge red in the designer</td><td>Read the message; e.g. heel narrower than nut, radius too small for the width, or cutout too big.</td></tr>
+<tr><td>Toolpath says blank is too small / too thin</td><td>Increase the blank size or thickness; see the minimum shown under Min. blank thickness.</td></tr>
+<tr><td>Toolpath “out of date”</td><td>Press GENERATE after changing the board or settings.</td></tr>
+<tr><td>Splitting on one edge</td><td>Switch the outline direction (climb / conventional).</td></tr>
+<tr><td>Travel feels slow or too fast</td><td>Set Fast travel to your machine's real maximum.</td></tr></table>
+</body></html>

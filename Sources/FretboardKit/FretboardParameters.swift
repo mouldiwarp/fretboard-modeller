@@ -13,7 +13,7 @@ public struct FretboardParameters: Equatable, Sendable {
     public var nutWidth: Double = 43.0
     public var lastFretWidth: Double = 56.0
     public var fretCount: Int = 22
-    public var hasSpokeWheelTrussRod: Bool = false
+    public var hasSpokeWheelTrussRod: Bool = true
     /// Board length past the last fret when a spoke-wheel truss rod is used (at least `minimumExtension`).
     public var trussRodExtension: Double = 9.0
     /// Added to the length at the narrow (nut) end.
