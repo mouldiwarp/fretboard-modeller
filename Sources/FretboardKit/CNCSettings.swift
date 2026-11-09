@@ -1,19 +1,19 @@
 import Foundation
 import simd
 
-public enum CutterType: String, CaseIterable, Sendable, Identifiable {
-    case flat, ball
-    public var id: String { rawValue }
-    public var title: String { self == .flat ? "Flat end mill" : "Ball nose" }
-}
-
 /// CNC job settings. Machine coordinates: X/Y match the model (X0 = heel edge, Y0 = board centre line),
 /// Z0 = top of the stock, so cutting depths are negative.
 public struct CNCSettings: Equatable, Sendable {
-    public var cutter: CutterType = .flat
+    /// Flat end mill diameter.
     public var cutterDiameter = 6.0
+
+    // Blank (stock). Board X0 is its heel edge, Y0 its centre line; the blank is centred on Y0.
     /// Stock thickness. The bottom of the board is the bottom of the stock (Z = -stockThickness).
     public var stockThickness = 12.0
+    public var stockLength = 520.0
+    public var stockWidth = 80.0
+    /// Distance from the blank's heel-side edge to the board's heel edge (X0).
+    public var stockHeelMargin = 20.0
 
     // WorkBee Z1+ motion limits
     public var xyFeed = 1000.0           // mm/min, X/Y cutting
@@ -25,7 +25,7 @@ public struct CNCSettings: Equatable, Sendable {
     /// Material left on the surface and outline by the roughing passes.
     public var roughAllowance = 0.5
     public var roughOverlap = 0.20       // stepover = diameter x (1 - overlap)
-    public var finishOverlap = 0.30
+    public var finishOverlap = 0.50
     /// Clearance height above the stock top used for rapid moves.
     public var safeZ = 5.0
     /// How far past the board edge (beyond the cutter radius) the surface passes extend.
@@ -34,12 +34,36 @@ public struct CNCSettings: Equatable, Sendable {
     public var outlineFloorAllowance = 0.5
     /// How far the finishing outline cut goes into the spoilboard.
     public var throughCutExtra = 0.2
+    /// Width of the roughing trench around the board, as a multiple of the cutter diameter. It is cut as
+    /// several loops, outermost first, so the pass next to the board is the last one on each layer.
+    public var trenchWidthFactor = 1.5
+    /// Tabs left in the final outline cut to hold the board in the surrounding stock.
+    public var tabCount = 4
+    public var tabWidth = 5.0
+    public var tabHeight = 1.5
+    /// Climb milling (counter-clockwise around the board, clockwise spindle) or conventional (clockwise).
+    public var climbOutline = true
     /// Spindle speed for M3 (0 = no spindle commands, e.g. a manually controlled router).
     public var spindleRPM = 0
 
     public init() {}
 
     public var cutterRadius: Double { cutterDiameter / 2 }
+    public var stockMinX: Double { -stockHeelMargin }
+    public var stockMaxX: Double { -stockHeelMargin + stockLength }
+    public var stockHalfWidth: Double { stockWidth / 2 }
+    /// Width of the rough outline trench, measured from the 0.5 mm wall left on the board.
+    public var trenchWidth: Double { trenchWidthFactor * cutterDiameter }
+    /// Tool-centre offsets of the trench loops from the board outline, outermost first.
+    public var trenchLoopOffsets: [Double] {
+        let r = cutterRadius
+        let dIn = roughAllowance + r
+        let dOut = max(dIn, roughAllowance + trenchWidth - r)
+        guard dOut - dIn > 1e-6 else { return [dIn] }
+        let step = max(1e-3, cutterDiameter * (1 - roughOverlap))
+        let n = 1 + Int(ceil((dOut - dIn) / step - 1e-9))
+        return (0..<n).map { dOut - (dOut - dIn) * Double($0) / Double(n - 1) }
+    }
 
     public func validate(for params: FretboardParameters) -> [String] {
         var e: [String] = []
@@ -54,10 +78,40 @@ public struct CNCSettings: Equatable, Sendable {
             e.append("Stock must be at least \(String(format: "%.1f", params.thickness + roughAllowance + 0.5)) mm thick.")
         }
         if safeZ <= 0 { e.append("Safe Z must be above the stock top.") }
-        if params.hasSpokeWheelTrussRod, params.cutoutWidth / 2 <= cutterRadius + roughAllowance {
-            e.append("Cutter is too wide for the truss rod cutout.")
+        if trenchWidthFactor < 1 { e.append("Trench width must be at least one cutter diameter.") }
+        if tabCount < 0 || tabWidth <= 0 || tabHeight <= 0 || tabHeight >= stockThickness - 1 {
+            e.append("Tab settings are not valid.")
+        }
+        // The blank must contain the board.
+        let layout = FretboardLayout(params)
+        let halfMax = layout.taperHalfWidth(at: layout.cornerTangentX)
+        if stockLength <= 0 || stockWidth <= 0 { e.append("Blank size must be positive.") }
+        if stockMinX > -1 || stockMaxX < layout.xEnd + 1 || stockHalfWidth < halfMax + 1 {
+            e.append("The blank is too small for the board (needs at least 1 mm all round).")
+        }
+        if params.hasSpokeWheelTrussRod {
+            let c = params.cutoutWidth / 2, nd = params.cutoutDepth
+            for d in trenchLoopOffsets + [cutterRadius] {
+                let room = d <= nd ? c - d : c - (2 * d * nd - nd * nd).squareRoot()
+                if room <= 0.05 { e.append("The cutout is too narrow for the roughing trench / cutter."); break }
+            }
         }
         return e
+    }
+}
+
+extension CNCSettings {
+    /// Non-blocking advice shown next to the settings.
+    public func warnings(for params: FretboardParameters) -> [String] {
+        var w: [String] = []
+        let layout = FretboardLayout(params)
+        let need = roughAllowance + trenchWidth
+        let halfMax = layout.taperHalfWidth(at: layout.cornerTangentX)
+        let sides = [("heel end", -stockMinX), ("nut end", stockMaxX - layout.xEnd), ("sides", stockHalfWidth - halfMax)]
+        for (name, m) in sides where m < need {
+            w.append(String(format: "Only %.1f mm of blank at the %@; the roughing trench needs %.1f mm and will run off the blank.", m, name, need))
+        }
+        return w
     }
 }
 

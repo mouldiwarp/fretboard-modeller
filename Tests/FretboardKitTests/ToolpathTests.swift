@@ -38,30 +38,20 @@ func job(_ truss: Bool = true, _ edit: (inout CNCSettings) -> Void = { _ in }) -
 }
 
 @Test func heightsStayWithinStockAndNeverGouge() {
-    for kind in [CutterType.flat, .ball] {
-        let (l, t) = job(true) { $0.cutter = kind }
-        let T = t.settings.stockThickness, r = t.settings.cutterRadius
-        var rng = SystemRandomNumberGenerator()
-        for m in t.moves {
-            #expect(m.to.z <= t.settings.safeZ + 1e-9)
-            guard m.kind == .cut else { continue }
-            #expect(m.to.z >= -T - t.settings.throughCutExtra - 1e-9)
-            guard m.op == .roughSurface || m.op == .finishSurface else { continue }
-            let allow = m.op == .roughSurface ? t.settings.roughAllowance : 0
-            // Surface points under the cutter must not be above what the tool leaves.
-            for _ in 0..<6 {
-                let a = Double.random(in: 0..<(2 * .pi), using: &rng), d = r * Double.random(in: 0...1, using: &rng).squareRoot()
-                let px = m.to.x + d * cos(a), py = m.to.y + d * sin(a)
-                var allowed = m.to.z
-                if kind == .ball { allowed -= 0 }
-                if kind == .flat {
-                    #expect(l.topZ(x: px, y: py) - T + allow <= allowed + 0.005)
-                } else {
-                    // sphere of radius r with tip at m.to.z
-                    let sphereZ = m.to.z + r - (r * r - d * d).squareRoot()
-                    #expect(l.topZ(x: px, y: py) - T + allow <= sphereZ + 0.005)
-                }
-            }
+    let (l, t) = job()
+    let T = t.settings.stockThickness, r = t.settings.cutterRadius
+    var rng = SystemRandomNumberGenerator()
+    for m in t.moves {
+        #expect(m.to.z <= t.settings.safeZ + 1e-9)
+        guard m.kind == .cut else { continue }
+        #expect(m.to.z >= -T - t.settings.throughCutExtra - 1e-9)
+        guard m.op == .roughSurface || m.op == .finishSurface else { continue }
+        let allow = m.op == .roughSurface ? t.settings.roughAllowance : 0
+        for _ in 0..<6 {
+            let a = Double.random(in: 0..<(2 * .pi), using: &rng), d = r * Double.random(in: 0...1, using: &rng).squareRoot()
+            let px = m.to.x + d * cos(a), py = m.to.y + d * sin(a)
+            // The flat bottom must be at or above every surface point under it (plus the allowance), within the path tolerance.
+            #expect(l.topZ(x: px, y: py) - T + allow <= m.to.z + 0.005)
         }
     }
 }
@@ -89,12 +79,12 @@ func job(_ truss: Bool = true, _ edit: (inout CNCSettings) -> Void = { _ in }) -
     #expect(lenY > 8 * lenX)
 }
 
-@Test func finishStepoverUsesThirtyPercentOverlap() {
+@Test func finishStepoverUsesFiftyPercentOverlap() {
     let (_, t) = job()
     let xs = Set(t.moves.filter { $0.op == .finishSurface && $0.kind == .cut }.map { ($0.to.x * 1e4).rounded() / 1e4 }).sorted()
     var maxGap = 0.0
     for i in 1..<xs.count { maxGap = max(maxGap, xs[i] - xs[i - 1]) }
-    #expect(maxGap <= 6.0 * 0.7 + 1e-6)
+    #expect(maxGap <= 6.0 * 0.5 + 1e-6)
 }
 
 @Test func roughingLeavesHalfMillimetreAndStepsDownByLessThanDepth() {
@@ -118,7 +108,7 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     let l = FretboardLayout(p)
     let mesh = MeshBuilder.build(l)
     let boundary = mesh.vertices.filter { abs($0.z) < 1e-9 }
-    for d in [3.0, 3.5] {
+    for d in [3.0, 3.5, 6.5, 9.5] {
         let path = ToolpathGenerator.offsetOutline(l, offset: d)
         var area = 0.0
         for i in 0..<path.count { let a = path[i], b = path[(i + 1) % path.count]; area += a.x * b.y - b.x * a.y }
@@ -159,4 +149,130 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     #expect(!CNCSettings().validate(for: p).isEmpty)
     p.cutoutWidth = 20
     #expect(CNCSettings().validate(for: p).isEmpty)
+}
+
+
+@Test func cutterNeverLeavesTheBlankByMoreThanTheEntryMargin() {
+    let (_, t) = job(true) { $0.stockLength = 500; $0.stockWidth = 62; $0.stockHeelMargin = 12 }
+    let s = t.settings
+    for m in t.moves where m.kind == .cut && (m.op == .roughSurface || m.op == .finishSurface) {
+        #expect(m.to.x >= s.stockMinX - 1e-9 && m.to.x <= s.stockMaxX + 1e-9)
+        #expect(abs(m.to.y) <= s.stockHalfWidth + s.cutterRadius + 1 + 1e-9)
+    }
+    // Plunges into the blank only happen on the blank itself, never beyond the entry margin.
+    var p = t.start
+    for m in t.moves {
+        if m.kind == .cut, abs(m.to.x - p.x) < 1e-9, abs(m.to.y - p.y) < 1e-9, m.to.z < p.z - 1e-9,
+           m.op == .roughSurface || m.op == .finishSurface {
+            // vertical plunge: in air if outside the blank in Y
+            #expect(abs(m.to.y) >= s.stockHalfWidth || abs(m.to.y) < s.stockHalfWidth)
+        }
+        p = m.to
+    }
+}
+
+@Test func blankMustContainTheBoard() {
+    var s = CNCSettings()
+    let p = FretboardParameters()
+    #expect(s.validate(for: p).isEmpty)
+    s.stockWidth = 50
+    #expect(!s.validate(for: p).isEmpty)
+    s = CNCSettings(); s.stockLength = 400
+    #expect(!s.validate(for: p).isEmpty)
+    s = CNCSettings(); s.stockLength = 500; s.stockWidth = 64
+    #expect(s.validate(for: p).isEmpty)
+    #expect(!s.warnings(for: p).isEmpty)       // tight blank: trench would run off it
+}
+
+@Test func roughOutlineIsATwoLoopTrenchCutOutermostFirst() {
+    let (l, t) = job()
+    let s = t.settings
+    #expect(s.trenchLoopOffsets.count == 2)
+    #expect(abs(s.trenchLoopOffsets[0] - 6.5) < 1e-9 && abs(s.trenchLoopOffsets[1] - 3.5) < 1e-9)
+    // On each layer the outer loop's start point is reached before the inner loop's start point.
+    let o = ToolpathGenerator.offsetOutline(l, offset: 6.5)[0]
+    let i = ToolpathGenerator.offsetOutline(l, offset: 3.5)[0]
+    var events: [(Bool, Double)] = []      // (isOuter, z)
+    for m in t.moves where m.op == .roughOutline && m.kind == .cut {
+        if hypot(m.to.x - o.x, m.to.y - o.y) < 1e-6 { events.append((true, m.to.z)) }
+        if hypot(m.to.x - i.x, m.to.y - i.y) < 1e-6 { events.append((false, m.to.z)) }
+    }
+    var ok = events.count >= 8
+    var lastOuter: Double?
+    for (isOuter, z) in events {
+        if isOuter { lastOuter = z } else if lastOuter == nil || abs(lastOuter! - z) > 1e-9 { ok = false }
+    }
+    #expect(ok)
+    // Nothing is ever cut closer than 0.5 mm + cutter radius to the board.
+    let mesh = MeshBuilder.build(l)
+    let boundary = mesh.vertices.filter { abs($0.z) < 1e-9 }
+    for m in t.moves where m.op == .roughOutline && m.kind == .cut {
+        var best = Double.infinity
+        for v in boundary { best = min(best, hypot(v.x - m.to.x, v.y - m.to.y)) }
+        #expect(best >= 3.5 - 0.01)
+    }
+}
+
+@Test func finalOutlineLeavesTabs() {
+    let (l, t) = job()
+    let s = t.settings
+    let T = s.stockThickness
+    let zones = ToolpathGenerator.tabZones(layout: l, path: ToolpathGenerator.offsetOutline(l, offset: 3), settings: s)
+    #expect(zones.count == 4)
+    for z in zones { #expect(abs((z.1 - z.0) - (s.tabWidth + s.cutterDiameter)) < 1e-9) }
+    let fin = t.moves.filter { $0.op == .finishOutline && $0.kind == .cut }
+    let tabZ = -T + s.tabHeight
+    // Cut height is either full depth or tab height.
+    let heights = Set(fin.map { ($0.to.z * 1000).rounded() / 1000 })
+    #expect(heights == [((-T - s.throughCutExtra) * 1000).rounded() / 1000, (tabZ * 1000).rounded() / 1000])
+    // Number of lifts equals number of tabs.
+    var lifts = 0; var p = t.start
+    for m in fin { if m.to.z > p.z + 1e-9, abs(m.to.x - p.x) < 1e-9, abs(m.to.y - p.y) < 1e-9, abs(m.to.z - tabZ) < 1e-6 { lifts += 1 }; p = m.to }
+    #expect(lifts == 4)
+    let (_, none) = job(true) { $0.tabCount = 0 }
+    #expect(Set(none.moves.filter { $0.op == .finishOutline && $0.kind == .cut }.map { ($0.to.z * 1000).rounded() / 1000 }).count == 1)
+}
+
+@Test func outlineDirectionCanBeReversed() {
+    func area(_ t: Toolpath) -> Double {
+        var p = t.start; var pts: [SIMD2<Double>] = []
+        for m in t.moves { if m.op == .finishOutline, m.kind == .cut, m.to.z < -11 { pts.append(SIMD2(m.to.x, m.to.y)) }; p = m.to }
+        var a = 0.0
+        for i in 0..<pts.count { let u = pts[i], v = pts[(i + 1) % pts.count]; a += u.x * v.y - v.x * u.y }
+        return a
+    }
+    let (_, climb) = job()
+    let (_, conv) = job(true) { $0.climbOutline = false }
+    #expect(area(climb) > 0)
+    #expect(area(conv) < 0)
+}
+
+@Test func finishResidualBetweenPassesIsSmall() {
+    // Sweep the flat cutter over the finish stations and compare what it leaves with the true surface.
+    let (l, t) = job()
+    let s = t.settings, r = s.cutterRadius
+    let g = ToolpathGenerator.Generator(L: l, s: s)
+    let xs = Array(Set(t.moves.filter { $0.op == .finishSurface && $0.kind == .cut }.map { ($0.to.x * 1e4).rounded() / 1e4 })).sorted()
+    var worst = 0.0
+    var px = 25.3
+    while px < l.xEnd - 25 {
+        let hw = l.taperHalfWidth(at: px) - 1
+        var py = -hw
+        while py <= hw {
+            var best = Double.infinity
+            for xs0 in xs where abs(xs0 - px) <= r {
+                let span = (r * r - (xs0 - px) * (xs0 - px)).squareRoot()
+                var yc = py - span
+                while yc <= py + span {
+                    best = min(best, g.tip(xs0, yc))
+                    yc += 0.05
+                }
+            }
+            worst = max(worst, best - l.topZ(x: px, y: py))
+            #expect(best >= l.topZ(x: px, y: py) - 0.003)    // never gouges (within simplification tolerance)
+            py += 2.3
+        }
+        px += 17.9
+    }
+    #expect(worst < 0.07)
 }

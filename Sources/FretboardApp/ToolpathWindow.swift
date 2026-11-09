@@ -169,15 +169,16 @@ struct CNCSettingsPanel: View {
         let errors = store.params.validate().isEmpty ? tp.settings.validate(for: store.params) : ["Fix the board parameters first."]
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                SectionLabel("Cutter & stock")
-                HStack(spacing: 4) {
-                    ForEach(CutterType.allCases) { c in
-                        LatchButton(title: c.title.uppercased(), on: tp.settings.cutter == c) { tp.settings.cutter = c }
-                    }
-                }
-                NumberField(title: "Cutter diameter", value: $tp.settings.cutterDiameter)
-                NumberField(title: "Stock thickness", value: $tp.settings.stockThickness)
-                Text("Z0 is the top of the stock. The board bottom is the stock bottom.")
+                SectionLabel("Cutter & blank")
+                NumberField(title: "Flat end mill", value: $tp.settings.cutterDiameter)
+                NumberField(title: "Blank length", value: $tp.settings.stockLength)
+                NumberField(title: "Blank width", value: $tp.settings.stockWidth)
+                NumberField(title: "Blank thickness", value: $tp.settings.stockThickness)
+                NumberField(title: "Heel edge from blank end", value: $tp.settings.stockHeelMargin)
+                Text(String(format: "Nut end: %.1f mm of blank beyond the board. Blank is centred on the board's centre line.",
+                            tp.settings.stockMaxX - FretboardLayout(store.params).xEnd))
+                    .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
+                Text("Z0 is the top of the blank. The board bottom is the blank bottom.")
                     .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
 
                 SectionLabel("Feeds (WorkBee Z1+)").padding(.top, 4)
@@ -189,10 +190,21 @@ struct CNCSettingsPanel: View {
                 NumberField(title: "Depth per pass", value: $tp.settings.roughDepthPerPass)
                 NumberField(title: "Material left", value: $tp.settings.roughAllowance)
                 NumberField(title: "Surface overlap", value: pct($tp.settings.roughOverlap), unit: "%")
+                NumberField(title: "Trench width (× cutter)", value: $tp.settings.trenchWidthFactor, unit: "×")
 
                 SectionLabel("Finishing").padding(.top, 4)
                 NumberField(title: "Surface overlap", value: pct($tp.settings.finishOverlap), unit: "%")
                 NumberField(title: "Cut into spoilboard", value: $tp.settings.throughCutExtra)
+
+                SectionLabel("Outline").padding(.top, 4)
+                HStack(spacing: 4) {
+                    LatchButton(title: "CLIMB (CCW)", on: tp.settings.climbOutline) { tp.settings.climbOutline = true }
+                    LatchButton(title: "CONVENTIONAL (CW)", on: !tp.settings.climbOutline) { tp.settings.climbOutline = false }
+                }
+                NumberField(title: "Tabs", value: Binding(get: { Double(tp.settings.tabCount) },
+                                                           set: { tp.settings.tabCount = max(0, Int($0)) }), unit: "")
+                NumberField(title: "Tab width", value: $tp.settings.tabWidth)
+                NumberField(title: "Tab height", value: $tp.settings.tabHeight)
 
                 SectionLabel("Other").padding(.top, 4)
                 NumberField(title: "Safe Z above stock", value: $tp.settings.safeZ)
@@ -202,6 +214,14 @@ struct CNCSettingsPanel: View {
                                                                           set: { tp.settings.spindleRPM = max(0, Int($0)) }),
                             unit: "rpm")
 
+                if errors.isEmpty {
+                    ForEach(tp.settings.warnings(for: store.params), id: \.self) { warn in
+                        HStack(alignment: .top, spacing: 6) {
+                            LedDot(on: true, color: Theme.warn, size: 6).padding(.top, 3)
+                            Text(warn).font(Theme.heading(10.5)).foregroundStyle(Theme.warn)
+                        }
+                    }
+                }
                 if !errors.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(errors, id: \.self) { err in
@@ -263,7 +283,7 @@ struct SummaryPanel: View {
                         }
                     }
                     SectionLabel("Sequence").padding(.top, 6)
-                    Text("1  Rough the top surface in passes across the board width, extending past the edges, leaving 0.5 mm.\n2  Rough the outline, leaving 0.5 mm on the edge and the floor.\n3  Finish the surface at 30% overlap.\n4  Cut the outline at full depth for a clean edge.")
+                    Text("1  Rough the top surface in passes across the board width, extending past the edges to the blank, leaving 0.5 mm.\n2  Rough a trench round the outline, outer loop then inner loop on every layer, leaving 0.5 mm on the edge and floor.\n3  Finish the surface at 50% overlap.\n4  Cut the outline at full depth, leaving tabs.")
                         .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
                 } else {
                     Text("Generate a toolpath to see the job summary.")

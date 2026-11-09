@@ -10,9 +10,11 @@ A native macOS app (SwiftUI + SceneKit) that builds a dimensionally accurate gui
 
 ## CNC toolpath (WorkBee Z1+)
 The **TOOLPATH** button opens a second window that generates G-code (Duet / RepRapFirmware dialect) and plays the run back at 1x to 1000x with a moving cutter and live X/Y/Z/feed readout.
-- Order: rough the top surface (passes across the board width, extending past the edges, 1.5 mm deep, 0.5 mm left, 20% overlap), rough the outline (0.5 mm left), finish the surface (30% overlap), then a full-depth outline cut.
+- Order: rough the top surface (passes across the board width, extending past the edges to the blank, 1.5 mm deep, 0.5 mm left, 20% overlap), rough a trench round the outline (1.5 x cutter width, outer loop first then the inner loop on each layer, so the cut beside the board is the lightest), finish the surface (50% overlap), then a full-depth outline cut.
+- Blank size is set before generating (length, width, thickness, heel margin); the path is clipped to the blank and validated against it.
+- Tabs (default 4, 5 mm wide, 1.5 mm tall) hold the board in the blank during the final outline cut and are left to be cut away by hand. The outline can run climb (CCW) or conventional (CW) to suit the spindle direction and avoid splitting.
 - Feeds: X/Y 1000 mm/min, Z 800 mm/min, fast travel configurable (default 2500 mm/min, Ooznest's documented maximum feed rate - set it to your machine's configured maximum).
-- Work origin: X0 = heel edge, Y0 = board centre line, Z0 = top of stock. Default cutter is a 6 mm flat end mill (ball nose also available).
+- Work origin: X0 = heel edge, Y0 = board centre line, Z0 = top of stock. Cutter is a 6 mm flat end mill.
 
 ## Build and run
 ```sh

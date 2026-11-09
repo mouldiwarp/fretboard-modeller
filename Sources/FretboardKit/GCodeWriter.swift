@@ -13,7 +13,10 @@ public enum GCodeWriter {
         }
         out.append("; Work origin: X0 = heel edge of board, Y0 = board centre line, Z0 = TOP of stock")
         out.append(String(format: "; Stock %.2f mm thick. Board bottom is the stock bottom (Z%.2f)", s.stockThickness, -s.stockThickness))
-        out.append(String(format: "; Cutter: %.2f mm %@", s.cutterDiameter, s.cutter.title.lowercased()))
+        out.append(String(format: "; Cutter: %.2f mm flat end mill", s.cutterDiameter))
+        out.append(String(format: "; Blank: %.1f x %.1f mm, heel edge of board is %.1f mm in from the blank's end; blank centred on Y0",
+                          s.stockLength, s.stockWidth, s.stockHeelMargin))
+        out.append(String(format: "; Outline direction: %@; %d tabs", s.climbOutline ? "climb (counter-clockwise)" : "conventional (clockwise)", s.tabCount))
         out.append(String(format: "; Feeds: X/Y %.0f, Z %.0f, rapid %.0f mm/min", s.xyFeed, s.zFeed, s.rapidFeed))
         out.append(String(format: "; Estimated run time: %@", formatTime(t.totalTime)))
         out.append("G21        ; millimetres")

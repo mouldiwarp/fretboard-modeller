@@ -113,21 +113,17 @@ struct ToolpathViewer: NSViewRepresentable {
             var p = tp.start
             for m in tp.moves { from.append(p); to.append(m.to); ops.append(m.op); kinds.append(m.kind); p = m.to }
 
-            // Stock outline from the extent of the roughing passes.
-            var minP = SIMD3<Double>(repeating: .infinity), maxP = SIMD3<Double>(repeating: -.infinity)
-            for (i, m) in tp.moves.enumerated() where m.op == .roughSurface && m.kind == .cut {
-                minP = simd_min(minP, to[i]); maxP = simd_max(maxP, to[i])
-            }
-            if minP.x.isFinite {
-                let r = tp.settings.cutterRadius
-                let x0 = minP.x - r, x1 = maxP.x + r, y0 = minP.y - r, y1 = maxP.y + r
+            // The blank (stock), from the job settings.
+            do {
+                let st = tp.settings
+                let x0 = st.stockMinX, x1 = st.stockMaxX, y0 = -st.stockHalfWidth, y1 = st.stockHalfWidth
                 var segs: [(SIMD3<Double>, SIMD3<Double>)] = []
                 for z in [0.0, -T] {
                     segs += [(SIMD3(x0, y0, z), SIMD3(x1, y0, z)), (SIMD3(x1, y0, z), SIMD3(x1, y1, z)),
                              (SIMD3(x1, y1, z), SIMD3(x0, y1, z)), (SIMD3(x0, y1, z), SIMD3(x0, y0, z))]
                 }
                 for (x, y) in [(x0, y0), (x1, y0), (x1, y1), (x0, y1)] { segs.append((SIMD3(x, y, 0), SIMD3(x, y, -T))) }
-                stockNode.addChildNode(ModelViewer.Coordinator.lines(segs, color: NSColor(white: 0.32, alpha: 1)))
+                stockNode.addChildNode(ModelViewer.Coordinator.lines(segs, color: NSColor(white: 0.4, alpha: 1)))
             }
 
             // Dim preview of every cutting move.
@@ -161,11 +157,6 @@ struct ToolpathViewer: NSViewRepresentable {
             body.eulerAngles.x = .pi / 2
             body.position = SCNVector3(0, 0, h / 2)
             toolNode.addChildNode(body)
-            if tp.settings.cutter == .ball {
-                let tipSphere = SCNNode(geometry: SCNSphere(radius: r)); tipSphere.geometry?.materials = [mat]
-                tipSphere.position = SCNVector3(0, 0, r)
-                toolNode.addChildNode(tipSphere); body.position = SCNVector3(0, 0, h / 2 + r)
-            }
             update(index: 0, pos: tp.start)
         }
 

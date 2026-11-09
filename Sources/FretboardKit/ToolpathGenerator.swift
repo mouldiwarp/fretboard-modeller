@@ -39,17 +39,51 @@ public enum ToolpathGenerator {
         arc(rc, yc, rc + d, thN, Double.pi)                // heel corner (+y)
         if hasNotch {
             add(-d, c)
-            arc(0, c, d, Double.pi, 1.5 * Double.pi)       // convex mouth corner
-            if rf > d { arc(nd - rf, c - rf, rf - d, Double.pi / 2, 0) } else { add(nd - d, c - d) }
-            if rf > d { arc(nd - rf, -(c - rf), rf - d, 0, -Double.pi / 2) } else { add(nd - d, -(c - d)) }
-            add(0, -(c - d))
-            arc(0, -c, d, Double.pi / 2, Double.pi)        // convex mouth corner
+            if d <= nd {
+                arc(0, c, d, Double.pi, 1.5 * Double.pi)   // convex mouth corner
+                if rf > d { arc(nd - rf, c - rf, rf - d, Double.pi / 2, 0) } else { add(nd - d, c - d) }
+                if rf > d { arc(nd - rf, -(c - rf), rf - d, 0, -Double.pi / 2) } else { add(nd - d, -(c - d)) }
+                add(0, -(c - d))
+                arc(0, -c, d, Double.pi / 2, Double.pi)    // convex mouth corner
+            } else {
+                // The offset is deeper than the cutout: the back wall's offset line (x = nd - d) is
+                // reached while still going round the mouth corners.
+                let a = acos((nd - d) / d)                 // in (π/2, π]
+                arc(0, c, d, Double.pi, 2 * Double.pi - a)
+                arc(0, -c, d, a, Double.pi)
+            }
         }
         add(-d, -yc)
         arc(rc, -yc, rc + d, Double.pi, 2 * Double.pi - thN)   // heel corner (-y)
         arc(xEnd, -hwE, d, 2 * Double.pi - thN, 2 * Double.pi) // convex nut-end corner (-y)
         add(xEnd + d, 0)
         return pts
+    }
+
+    /// Arc-length intervals along `path` where the cutter is lifted to leave tabs. Tabs sit on the two straight
+    /// long sides. The lift is wider than the tab by the cutter diameter, because the cutter's footprint
+    /// reaches half a diameter either side of its centre.
+    public static func tabZones(layout L: FretboardLayout, path: [SIMD2<Double>], settings s: CNCSettings) -> [(Double, Double)] {
+        guard s.tabCount > 0, path.count > 1 else { return [] }
+        var cum = [0.0]
+        for i in 1..<path.count { cum.append(cum[i - 1] + simd_distance(path[i], path[i - 1])) }
+        var zones: [(Double, Double)] = []
+        let half = (s.tabWidth + s.cutterDiameter) / 2
+        for sign in [1.0, -1.0] {
+            let k = s.tabCount / 2 + (sign > 0 ? s.tabCount % 2 : 0)
+            for i in 0..<k {
+                let xc = L.xEnd * (Double(i) + 0.5) / Double(k)
+                for j in 1..<path.count {
+                    let a = path[j - 1], b = path[j]
+                    guard (a.x - xc) * (b.x - xc) <= 0, a.x != b.x, a.y * sign > 5, b.y * sign > 5 else { continue }
+                    let t = (xc - a.x) / (b.x - a.x)
+                    let sc = cum[j - 1] + t * (cum[j] - cum[j - 1])
+                    zones.append((sc - half, sc + half))
+                    break
+                }
+            }
+        }
+        return zones.sorted { $0.0 < $1.0 }
     }
 
     // MARK: Generator
@@ -61,27 +95,19 @@ public enum ToolpathGenerator {
         var pos: SIMD3<Double>
         let r: Double
         let T: Double
-        /// Sample offsets within the cutter footprint: (dx, dy, distance from centre).
-        let samples: [SIMD3<Double>]
+        /// Sample offsets within the cutter footprint (centre, then two rings).
+        let samples: [SIMD2<Double>]
 
         init(L: FretboardLayout, s: CNCSettings) {
             self.L = L; self.s = s
             pos = SIMD3(0, 0, s.safeZ)
             r = s.cutterRadius
             T = s.stockThickness
-            var sm: [SIMD3<Double>] = [SIMD3(0, 0, 0)]
+            var sm: [SIMD2<Double>] = [SIMD2(0, 0)]
             for (ring, n) in [(0.5, 8), (1.0, 16)] {
                 for i in 0..<n {
                     let a = 2 * Double.pi * Double(i) / Double(n)
-                    sm.append(SIMD3(cos(a) * ring * s.cutterRadius, sin(a) * ring * s.cutterRadius, ring * s.cutterRadius))
-                }
-            }
-            if s.cutter == .ball {
-                // The contact point sits close to the centre line of the cutter, towards the board's centre line (±Y),
-                // so sample that direction densely as well.
-                for f in [0.05, 0.1, 0.15, 0.2, 0.3, 0.45, 0.6, 0.8] {
-                    let d = f * s.cutterRadius
-                    sm.append(SIMD3(0, d, d)); sm.append(SIMD3(0, -d, d))
+                    sm.append(SIMD2(cos(a) * ring * s.cutterRadius, sin(a) * ring * s.cutterRadius))
                 }
             }
             samples = sm
@@ -89,18 +115,14 @@ public enum ToolpathGenerator {
 
         // MARK: Surface model
 
-        /// Height (model coordinates) of the cutter tip so it touches but never gouges the top surface.
+        /// Height (model coordinates) of the cutter's flat bottom so it touches but never gouges the top surface.
         func tip(_ x: Double, _ y: Double) -> Double {
             var m = -Double.infinity
-            for o in samples {
-                var z = L.topZ(x: x + o.x, y: y + o.y)
-                if s.cutter == .ball { z += (r * r - o.z * o.z).squareRoot() - r }
-                m = max(m, z)
-            }
+            for o in samples { m = max(m, L.topZ(x: x + o.x, y: y + o.y)) }
             return m
         }
 
-        /// Machine Z (top of stock = 0) for the cutter tip.
+        /// Machine Z (top of stock = 0) for the cutter bottom.
         func machineZ(_ x: Double, _ y: Double, allowance: Double) -> Double { tip(x, y) + allowance - T }
 
         // MARK: Move helpers
@@ -136,9 +158,15 @@ public enum ToolpathGenerator {
         // MARK: Job
 
         mutating func run() {
-            surfacePass(.roughSurface, allowance: s.roughAllowance, overlap: s.roughOverlap, layered: true)
+            // How far the cutter centre must travel beyond the board edge:
+            // roughing covers the whole outline trench, finishing only has to clear the board edge.
+            let roughReach = s.roughAllowance + s.trenchWidth - r + s.edgeMargin
+            let finishReach = r + s.edgeMargin
+            surfacePass(.roughSurface, allowance: s.roughAllowance, overlap: s.roughOverlap, layered: true,
+                        reach: roughReach, dy: 0.5, tol: 0.004)
             outlineRough()
-            surfacePass(.finishSurface, allowance: 0, overlap: s.finishOverlap, layered: false)
+            surfacePass(.finishSurface, allowance: 0, overlap: s.finishOverlap, layered: false,
+                        reach: finishReach, dy: 0.25, tol: 0.002)
             outlineFinish()
             retract(.finishOutline)
             rapid(SIMD3(0, 0, s.safeZ), .finishOutline)
@@ -146,21 +174,24 @@ public enum ToolpathGenerator {
 
         // MARK: Surface passes (raster along Y, stepping along the board length)
 
-        mutating func surfacePass(_ op: CutOperation, allowance: Double, overlap: Double, layered: Bool) {
+        mutating func surfacePass(_ op: CutOperation, allowance: Double, overlap: Double, layered: Bool,
+                                  reach: Double, dy: Double, tol: Double) {
             let step = s.cutterDiameter * (1 - overlap)
-            let x0 = -(r + s.edgeMargin), x1 = L.xEnd + r + s.edgeMargin
+            // Cutter centres stay on the blank; lines that reach its edge start and end just outside it,
+            // so the cutter enters and leaves in air rather than plunging into the blank.
+            let x0 = max(-reach, s.stockMinX), x1 = min(L.xEnd + reach, s.stockMaxX)
             let n = max(1, Int(ceil((x1 - x0) / step)))
-            let dy = 0.5
 
             struct Line { var x: Double; var ys: [Double]; var zt: [Double] }
             var lines: [Line] = []
             for i in 0...n {
                 let x = x0 + (x1 - x0) * Double(i) / Double(n)
-                let ye = L.taperHalfWidth(at: min(max(x, 0), L.xEnd)) + r + s.edgeMargin
-                let m = max(2, Int(ceil(2 * ye / dy)))
+                let ye = L.taperHalfWidth(at: min(max(x, 0), L.xEnd)) + reach
+                let yEnd = ye >= s.stockHalfWidth ? s.stockHalfWidth + r + 1 : ye
+                let m = max(2, Int(ceil(2 * yEnd / dy)))
                 var ys: [Double] = [], zt: [Double] = []
                 for j in 0...m {
-                    let y = -ye + 2 * ye * Double(j) / Double(m)
+                    let y = -yEnd + 2 * yEnd * Double(j) / Double(m)
                     ys.append(y); zt.append(machineZ(x, y, allowance: allowance))
                 }
                 lines.append(Line(x: x, ys: ys, zt: zt))
@@ -186,7 +217,7 @@ public enum ToolpathGenerator {
                     var idx = Array(i0...i1)
                     if !forward { idx.reverse() }
                     let raw = idx.map { j in SIMD2(line.ys[j], max(level, line.zt[j])) }
-                    let simp = Self.simplify(raw, tol: 0.004)
+                    let simp = Self.simplify(raw, tol: tol)
                     let first = SIMD3(line.x, simp[0].x, simp[0].y)
                     // Stay down and step over when the next line starts at (nearly) the same end of the raster.
                     let adjacent = si == lastStation + 1 && linked
@@ -234,39 +265,73 @@ public enum ToolpathGenerator {
 
         // MARK: Outline passes
 
+        /// Closed loop in the requested direction (counter-clockwise = climb with a clockwise spindle).
+        func loop(offset d: Double) -> [SIMD2<Double>] {
+            let p = ToolpathGenerator.offsetOutline(L, offset: d)
+            return s.climbOutline ? p : Array(p.reversed())
+        }
+
+        /// Rough the trench around the board: on each depth layer the outermost loop is cut first and the loop
+        /// beside the board last, so the board's edge is left by the lightest cut.
         mutating func outlineRough() {
-            let d = r + s.roughAllowance
-            let path = ToolpathGenerator.offsetOutline(L, offset: d)
+            let loops = s.trenchLoopOffsets.map { loop(offset: $0) }
+            guard let outer = loops.first?.first else { return }
             let floorZ = -T + s.outlineFloorAllowance
-            let topSurface = path.map { machineZ($0.x, $0.y, allowance: s.roughAllowance) }.max() ?? 0
+            let topSurface = loops.flatMap { $0 }.map { machineZ($0.x, $0.y, allowance: s.roughAllowance) }.max() ?? 0
             var levels: [Double] = []
             var l = min(0, topSurface)
             while l > floorZ + 1e-9 {
                 l = max(l - s.roughDepthPerPass, floorZ)
                 levels.append(l)
             }
-            runOutline(path, levels: levels, op: .roughOutline,
-                       surfaceAtStart: machineZ(path[0].x, path[0].y, allowance: s.roughAllowance))
-        }
-
-        mutating func outlineFinish() {
-            let path = ToolpathGenerator.offsetOutline(L, offset: r)
-            runOutline(path, levels: [-T - s.throughCutExtra], op: .finishOutline,
-                       surfaceAtStart: machineZ(path[0].x, path[0].y, allowance: 0))
-        }
-
-        mutating func runOutline(_ path: [SIMD2<Double>], levels: [Double], op: CutOperation, surfaceAtStart: Double) {
-            guard let p0 = path.first, !levels.isEmpty else { return }
-            var first = true
+            guard !levels.isEmpty else { return }
+            let op = CutOperation.roughOutline
+            var prevLevel: Double?
             for level in levels {
-                let start = SIMD3(p0.x, p0.y, level)
-                if first {
-                    enter(start, approachZ: surfaceAtStart + 1.0, op)
-                    first = false
+                let start = SIMD3(outer.x, outer.y, level)
+                if let pl = prevLevel {
+                    cut(SIMD3(outer.x, outer.y, pl), op)                // stay down, move back out to the outer loop
+                    cut(start, op)                                      // step down at Z feed
                 } else {
-                    cut(start, op)       // step down at the start point, at Z feed
+                    enter(start, approachZ: machineZ(outer.x, outer.y, allowance: s.roughAllowance) + 1.0, op)
                 }
-                for p in path.dropFirst() { cut(SIMD3(p.x, p.y, level), op) }
+                for (li, path) in loops.enumerated() {
+                    if li > 0 { cut(SIMD3(path[0].x, path[0].y, level), op) }   // step in to the next loop
+                    for p in path.dropFirst() { cut(SIMD3(p.x, p.y, level), op) }
+                }
+                prevLevel = level
+            }
+            retract(op)
+        }
+
+        /// Full-depth cut round the board, leaving tabs.
+        mutating func outlineFinish() {
+            let path = loop(offset: r)
+            guard let p0 = path.first else { return }
+            let op = CutOperation.finishOutline
+            let level = -T - s.throughCutExtra
+            let tabZ = -T + s.tabHeight
+            let zones = ToolpathGenerator.tabZones(layout: L, path: path, settings: s)
+            enter(SIMD3(p0.x, p0.y, level), approachZ: machineZ(p0.x, p0.y, allowance: 0) + 1.0, op)
+
+            var cum = [0.0]
+            for i in 1..<path.count { cum.append(cum[i - 1] + simd_distance(path[i], path[i - 1])) }
+            let events = zones.flatMap { [$0.0, $0.1] }.sorted()
+            var ei = 0
+            var z = level
+            for i in 1..<path.count {
+                let a = path[i - 1], b = path[i]
+                let sa = cum[i - 1], sb = cum[i]
+                while ei < events.count, events[ei] <= sb + 1e-9 {
+                    let e = max(events[ei], sa)
+                    let t = sb > sa ? (e - sa) / (sb - sa) : 1
+                    let p = a + (b - a) * t
+                    cut(SIMD3(p.x, p.y, z), op)
+                    z = (z == level) ? tabZ : level                      // lift over the tab / drop after it
+                    cut(SIMD3(p.x, p.y, z), op)
+                    ei += 1
+                }
+                if simd_distance(SIMD2(pos.x, pos.y), b) > 1e-9 || abs(pos.z - z) > 1e-9 { cut(SIMD3(b.x, b.y, z), op) }
             }
             retract(op)
         }
