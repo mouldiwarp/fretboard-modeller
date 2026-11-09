@@ -15,13 +15,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct FretboardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var store = ModelStore()
+    @StateObject private var toolpath = ToolpathStore()
 
     var body: some Scene {
         WindowGroup("Fretboard Modeller") {
             ContentView()
                 .environmentObject(store)
+                .environmentObject(toolpath)
         }
         .defaultSize(width: 1380, height: 880)
+
+        Window("Toolpath Simulation", id: "toolpath") {
+            ToolpathWindow()
+                .environmentObject(store)
+                .environmentObject(toolpath)
+        }
+        .defaultSize(width: 1380, height: 860)
     }
 }
 

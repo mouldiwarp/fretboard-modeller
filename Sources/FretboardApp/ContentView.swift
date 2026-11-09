@@ -4,6 +4,7 @@ import FretboardKit
 
 struct ContentView: View {
     @EnvironmentObject var store: ModelStore
+    @Environment(\.openWindow) private var openWindow
     @State private var preset: ViewPreset = .iso
     @State private var presetToken = 0
     @State private var showFrets = true
@@ -29,6 +30,7 @@ struct ContentView: View {
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
         .frame(minWidth: 1180, minHeight: 760)
+        .onAppear { if CommandLine.arguments.contains("--toolpath") { openWindow(id: "toolpath") } }
     }
 }
 
@@ -62,6 +64,7 @@ struct TopBar: View {
 
 struct BottomBar: View {
     @EnvironmentObject var store: ModelStore
+    @Environment(\.openWindow) private var openWindow
     @Binding var preset: ViewPreset
     @Binding var presetToken: Int
     @Binding var showFrets: Bool
@@ -83,6 +86,8 @@ struct BottomBar: View {
             Spacer()
             Text("Drag to orbit · ⌘ + scroll or pinch to zoom · click two points to measure")
                 .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
+            BigLampButton(title: "TOOLPATH", systemImage: "scope", tint: Theme.haze, lit: false,
+                          enabled: store.errors.isEmpty) { openWindow(id: "toolpath") }
             BigLampButton(title: "EXPORT STL", systemImage: "square.and.arrow.up",
                           enabled: store.errors.isEmpty) { store.exportSTL() }
         }

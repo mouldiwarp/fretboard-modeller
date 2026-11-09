@@ -124,7 +124,9 @@ struct NumberField: View {
             Text(unit)
                 .font(Theme.caption(10))
                 .foregroundStyle(Theme.dim)
-                .frame(width: 20, alignment: .leading)
+                .lineLimit(1)
+                .fixedSize()
+                .frame(minWidth: 20, alignment: .leading)
         }
     }
 }
@@ -201,5 +203,47 @@ struct FretboardGlyph: View {
         }
         .shadow(color: Theme.gold.opacity(0.7), radius: 3)
         .accessibilityHidden(true)
+    }
+}
+
+/// Horizontal level slider: recessed track, gold fill, metal knob.
+struct LevelSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var tint: Color = Theme.gold
+    @State private var dragStart: Double?
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width, knob: CGFloat = 14
+            let usable = max(1, w - knob)
+            let span = max(1e-9, range.upperBound - range.lowerBound)
+            let frac = (value - range.lowerBound) / span
+            let x = knob / 2 + usable * CGFloat(frac)
+            ZStack(alignment: .leading) {
+                Canvas { ctx, size in
+                    let mid = size.height / 2
+                    let track = CGRect(x: knob / 2, y: mid - 2.5, width: usable, height: 5)
+                    ctx.fill(Path(roundedRect: track, cornerRadius: 2.5), with: .color(Theme.track))
+                    ctx.stroke(Path(roundedRect: track, cornerRadius: 2.5), with: .color(.white.opacity(0.06)), lineWidth: 0.5)
+                    let fill = CGRect(x: knob / 2, y: mid - 1.5, width: max(0, x - knob / 2), height: 3)
+                    ctx.fill(Path(roundedRect: fill, cornerRadius: 1.5), with: .color(tint))
+                }
+                Circle()
+                    .fill(RadialGradient(colors: [Color(white: 0.85), Color(white: 0.45), Color(white: 0.2)],
+                                         center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: knob * 0.75))
+                    .overlay(Circle().strokeBorder(.black.opacity(0.5), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.8), radius: 2, y: 1)
+                    .frame(width: knob, height: knob)
+                    .offset(x: x - knob / 2)
+            }
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { g in
+                    let f = Double((g.location.x - knob / 2) / usable)
+                    value = min(range.upperBound, max(range.lowerBound, range.lowerBound + f * span))
+                })
+        }
+        .frame(height: 18)
     }
 }
