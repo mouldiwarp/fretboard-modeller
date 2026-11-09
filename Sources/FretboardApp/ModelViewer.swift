@@ -20,6 +20,21 @@ enum ViewPreset: String, CaseIterable, Identifiable {
 /// SCNView that adds Command+scroll (works with Magic Mouse) and pinch zooming.
 final class ZoomSCNView: SCNView {
     var zoomTarget = SCNVector3Zero
+    /// Called when the view is resized before the user has moved the camera, so framing can follow the new shape.
+    var onResize: (() -> Void)?
+    private var userMoved = false
+    private var lastSize = CGSize.zero
+
+    override func layout() {
+        super.layout()
+        if bounds.size != lastSize, bounds.width > 0, bounds.height > 0 {
+            lastSize = bounds.size
+            if !userMoved { onResize?() }
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) { userMoved = true; super.mouseDown(with: event) }
+    func resetUserMoved() { userMoved = false }
 
     private func zoom(by factor: CGFloat) {
         guard let node = pointOfView else { return }
@@ -33,12 +48,14 @@ final class ZoomSCNView: SCNView {
     }
 
     override func scrollWheel(with event: NSEvent) {
+        userMoved = true
         guard event.modifierFlags.contains(.command) else { super.scrollWheel(with: event); return }
         let dy = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * 8
         zoom(by: CGFloat(exp(-Double(dy) * 0.01)))
     }
 
     override func magnify(with event: NSEvent) {
+        userMoved = true
         zoom(by: max(0.1, 1 - event.magnification))
     }
 }

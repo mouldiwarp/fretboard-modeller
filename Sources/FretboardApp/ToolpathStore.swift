@@ -88,7 +88,6 @@ final class ToolpathStore: ObservableObject {
             playback.reset(total: result.1.last ?? 0)
             version += 1
             isGenerating = false
-            if CommandLine.arguments.contains("--autoplay") { playback.speed = 200; playback.toggle() }   // for testing
         }
     }
 

@@ -14,7 +14,7 @@ struct ToolpathWindow: View {
         VStack(spacing: 0) {
             ToolpathTopBar()
             HStack(alignment: .top, spacing: 10) {
-                CNCSettingsPanel().frame(width: 304)
+                CNCSettingsPanel().frame(width: 600)
                 ZStack {
                     if let path = tp.toolpath {
                         ToolpathViewerHost(toolpath: path, preset: preset, presetToken: presetToken,
@@ -43,7 +43,7 @@ struct ToolpathWindow: View {
         .foregroundStyle(Theme.text)
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
-        .frame(minWidth: 1180, minHeight: 720)
+        .frame(minWidth: 1500, minHeight: 760)
         .onAppear { if tp.toolpath == nil { tp.generate(params: store.params) } }
     }
 }
@@ -175,18 +175,20 @@ struct CNCSettingsPanel: View {
 
     var body: some View {
         let errors = store.params.validate().isEmpty ? tp.settings.validate(for: store.params) : ["Fix the board parameters first."]
-        ScrollView {
+        FitToHeight {
             VStack(alignment: .leading, spacing: 10) {
+              HStack(alignment: .top, spacing: 18) {
+                VStack(alignment: .leading, spacing: 8) {
                 SectionLabel("Cutter & blank")
                 NumberField(title: "Flat end mill", value: $tp.settings.cutterDiameter)
                 NumberField(title: "Blank length", value: $tp.settings.stockLength)
                 NumberField(title: "Blank width", value: $tp.settings.stockWidth)
                 NumberField(title: "Min. blank thickness", value: $tp.settings.stockThickness)
-                Text(String(format: "Needs at least %.1f mm (board %.1f + %.1f left + 0.5 mm) so there is a roughing pass to cut. Thickness the blank beforehand to about this.",
+                Text(String(format: "Needs ≥ %.1f mm (board %.1f + %.1f left + 0.5) to leave a roughing pass.",
                             tp.settings.minimumStockThickness(for: store.params), store.params.thickness, tp.settings.roughAllowance))
                     .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
                 NumberField(title: "Heel edge from blank end", value: $tp.settings.stockHeelMargin)
-                Text(String(format: "Nut end: %.1f mm of blank beyond the board. Blank is centred on the board's centre line.",
+                Text(String(format: "Nut end: %.1f mm of blank beyond the board. Blank is centred on the board.",
                             tp.settings.stockMaxX - FretboardLayout(store.params).xEnd))
                     .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
                 Text("Z0 is the top of the blank. The board bottom is the blank bottom.")
@@ -197,7 +199,10 @@ struct CNCSettingsPanel: View {
                 NumberField(title: "Z cutting", value: $tp.settings.zFeed, unit: "mm/min")
                 NumberField(title: "Fast travel", value: $tp.settings.rapidFeed, unit: "mm/min")
 
-                SectionLabel("Roughing").padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                VStack(alignment: .leading, spacing: 8) {
+                SectionLabel("Roughing")
                 NumberField(title: "Depth per pass", value: $tp.settings.roughDepthPerPass)
                 NumberField(title: "Material left", value: $tp.settings.roughAllowance)
                 NumberField(title: "Surface overlap", value: pct($tp.settings.roughOverlap), unit: "%")
@@ -225,6 +230,9 @@ struct CNCSettingsPanel: View {
                                                                           set: { tp.settings.spindleRPM = max(0, Int($0)) }),
                             unit: "rpm")
 
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+              }
                 if errors.isEmpty {
                     ForEach(tp.settings.warnings(for: store.params), id: \.self) { warn in
                         HStack(alignment: .top, spacing: 6) {
@@ -349,5 +357,26 @@ struct PlaybackBar: View {
         .frame(height: 48)
         .background(Theme.obsidian.opacity(0.88))
         .overlay(alignment: .top) { Rectangle().fill(Theme.gold.opacity(0.4)).frame(height: 1) }
+    }
+}
+
+/// Shows its content at natural size, scaling it down (never up) so the whole thing is visible in the available height.
+struct FitToHeight<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+    @State private var natural: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geo in
+            let scale = natural.height > 0 ? min(1, geo.size.height / natural.height, geo.size.width / max(natural.width, 1)) : 1
+            content()
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: geo.size.width / scale, alignment: .topLeading)
+                .background(GeometryReader { g in
+                    Color.clear.onAppear { natural = CGSize(width: geo.size.width, height: g.size.height) }
+                        .onChange(of: g.size.height) { natural = CGSize(width: geo.size.width, height: $0) }
+                })
+                .scaleEffect(scale, anchor: .topLeading)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+        }
     }
 }

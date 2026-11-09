@@ -47,6 +47,11 @@ struct ToolpathViewer: NSViewRepresentable {
         let amb = SCNNode(); amb.light = SCNLight(); amb.light!.type = .ambient; amb.light!.intensity = 450
         scene.rootNode.addChildNode(key); scene.rootNode.addChildNode(amb)
         c.view = view
+        view.onResize = { [weak c, weak view] in
+            guard let c, let f = c.lastFrame else { return }
+            view?.resetUserMoved()
+            c.frame(preset: f.0, layout: f.1, T: f.2)
+        }
         return view
     }
 
@@ -90,6 +95,7 @@ struct ToolpathViewer: NSViewRepresentable {
         var kinds: [MoveKind] = []
         var lastIndex = -1
         var lastShowRapids = true
+        var lastFrame: (ViewPreset, FretboardLayout, Double)?
 
         init() {
             [stockNode, ghostNode, pendingNode, chunkRoot, partialNode, toolNode].forEach { modelNode.addChildNode($0) }
@@ -185,8 +191,11 @@ struct ToolpathViewer: NSViewRepresentable {
         }
 
         func frame(preset: ViewPreset, layout L: FretboardLayout, T: Double) {
+            lastFrame = (preset, L, T)
             let center = SIMD3<Double>(L.xEnd / 2, 0, -T / 2)
-            let d = max(L.xEnd, 120) * 1.7
+            // Distance that shows the whole board across the view's width, whatever its aspect ratio.
+            let aspect = (view?.bounds.height ?? 0) > 0 ? Double(view!.bounds.width / view!.bounds.height) : 1.5
+            let d = max(max(L.xEnd, 120) * 1.7, L.xEnd * 0.6 / (tan(17.5 * .pi / 180) * max(aspect, 0.3)))
             let dir: SIMD3<Double>, up: SIMD3<Double>
             switch preset {
             case .iso: dir = simd_normalize(SIMD3(-0.35, -0.85, 0.6)); up = SIMD3(0, 0, 1)
