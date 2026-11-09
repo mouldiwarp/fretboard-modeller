@@ -270,7 +270,7 @@ struct ModelViewer: NSViewRepresentable {
 
         func frame(preset: ViewPreset, layout L: FretboardLayout) {
             let center = SIMD3<Double>(L.xEnd / 2, 0, 3)
-            let d = max(L.xEnd, 120) * 1.35
+            let d = max(L.xEnd, 120) * 1.7
             let dir: SIMD3<Double>
             let upModel: SIMD3<Double>
             switch preset {
