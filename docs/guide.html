@@ -20,6 +20,7 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <tr><td><b>Toolpath</b></td><td>Tab 3 (⌘3)</td><td>WorkBee Z1+ G-code (<code>.nc</code>) with animated playback</td></tr>
 <tr><td><b>Fret Template</b></td><td>Tab 4 (⌘4)</td><td>Marker-hole G-code for the chop-saw fret slot jig</td></tr></table>
 <p>Launch it from Spotlight (⌘ Space, “Fretboard Modeller”) after running <code>./make_app.sh</code>. The four tools are tabs along the top of the one window (⌘1 Designer, ⌘2 Markers, ⌘3 Toolpath, ⌘4 Fret Template). Toolpath is unavailable while the Designer inputs are invalid.</p>
+<p><b>Projects:</b> File › New Project (⌘N), Open… (⌘O), Save (⌘S) and Save As… (⇧⌘S) work with <code>.fretboard</code> files, which hold the board dimensions, CNC settings, markers, marker job settings and the inlay image itself. The project name is shown in the header; an amber dot (and “Edited” in the window title) means unsaved changes, and New, Open and Quit ask before discarding them. Generated toolpaths are not saved; press GENERATE again after opening.</p>
 
 <h2>2. Designer</h2>
 <img src="img/designer.png">
@@ -47,6 +48,7 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <h2 class="pb">Markers</h2>
 <p>Choose <b>Dots</b>, <b>Dots + 12th inlay</b> or <b>12th inlay only</b>. Dots are 6 mm × 3 mm in the middle of the selected fret spaces; the 12th and 24th are double dots under the B and A strings, using compensated string spacing from the nut (E strings 3 mm in from the edges) to a 52.4 mm tune-o-matic. For the inlay, <b>IMPORT</b> an image, <b>PASTE</b> one, drop one on the preview, or <b>CAPTURE</b> an area of the screen (allow Screen Recording if asked). Black becomes the pocket. Adjust the trace, then size (aspect locked or free), move, rotate or mirror it. The pockets appear in the Designer model and STL.</p>
 <p>Press <b>GENERATE</b> and export the two G-code files. The <i>dots</i> file uses the board job's origin and the 6 mm cutter. The <i>inlay</i> file is for the fine cutter and can use the board origin or the centre of the inlay (Z0 on the board surface there). It ramps into every loop, slows down in full-width slots, and finishes the walls lightly on each layer. Red areas in the preview are narrower than the cutter and will be left.</p>
+<p>After generating, switch the preview from <b>PLAN</b> to <b>3D DOTS</b> or <b>3D INLAY</b> to play a job on the board with a moving cutter and live X/Y/Z/feed readout, using the same controls as the Toolpath tab. The readout is in the job's own coordinates, so it matches the file even with the inlay-centre zero.</p>
 <div class="note">Run marker jobs after surfacing and before releasing the board from its tabs, with the same work offsets. Air-cut first with Z raised.</div>
 
 <h2 class="pb">3. Toolpath (CNC)</h2>

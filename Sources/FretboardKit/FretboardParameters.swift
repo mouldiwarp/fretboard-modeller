@@ -5,7 +5,7 @@ public enum Units {
 }
 
 /// All user-editable inputs. Lengths are millimetres unless noted.
-public struct FretboardParameters: Equatable, Sendable {
+public struct FretboardParameters: Equatable, Sendable, Codable {
     /// The board always extends at least this far past the last fret, truss rod or not.
     public static let minimumExtension = 9.0
 

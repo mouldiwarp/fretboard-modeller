@@ -9,27 +9,81 @@ struct MarkersView: View {
     @EnvironmentObject var store: ModelStore
     @EnvironmentObject var tp: ToolpathStore
     @EnvironmentObject var mk: MarkerStore
+    @State private var mode: MarkerPreviewMode = .plan
+    @State private var preset: ViewPreset = .iso
+    @State private var presetToken = 0
+
+    private func available(_ m: MarkerPreviewMode) -> Bool {
+        switch m {
+        case .plan: return true
+        case .dots3D: return mk.dotsPlayer != nil
+        case .inlay3D: return mk.inlayPlayer != nil
+        }
+    }
+
+    /// Frames the 3D view on the inlay, in the board job's machine coordinates.
+    private var inlayFocus: (center: SIMD3<Double>, span: Double) {
+        let L = store.layout
+        let c = store.markers.inlayCentre(L)
+        let span = max(store.markers.inlay.width, store.markers.inlay.height, 10) * 1.6
+        return (SIMD3(c.x, c.y, L.topZ(x: c.x, y: c.y) - tp.settings.stockThickness), span)
+    }
+
+    private var planView: some View {
+        VStack(spacing: 0) {
+            MarkerPreview(layout: store.layout, markers: store.markers,
+                          inlayJob: mk.showToolpath ? mk.inlayJob : nil, zoom: mk.zoomToInlay)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(1)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .gmCard()
+                .onDrop(of: [.fileURL, .image], isTargeted: nil) { providers in drop(providers) }
+            HStack(spacing: 4) {
+                LatchButton(title: "WHOLE BOARD", on: !mk.zoomToInlay) { mk.zoomToInlay = false }.frame(width: 110)
+                LatchButton(title: "12TH FRET", on: mk.zoomToInlay) { mk.zoomToInlay = true }.frame(width: 90)
+                LatchButton(title: "INLAY TOOLPATH", on: mk.showToolpath, tint: Theme.haze) { mk.showToolpath.toggle() }.frame(width: 120)
+                Spacer()
+                Text("Player's view: nut on the left, bass side at the top. Drop an image here to trace it.")
+                    .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    /// The selected view, or Plan when its job has gone (e.g. after opening a project).
+    private var shown: MarkerPreviewMode { available(mode) ? mode : .plan }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             MarkerSetupPanel().frame(width: 320)
             VStack(spacing: 0) {
-                MarkerPreview(layout: store.layout, markers: store.markers,
-                              inlayJob: mk.showToolpath ? mk.inlayJob : nil, zoom: mk.zoomToInlay)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding(1)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .gmCard()
-                    .onDrop(of: [.fileURL, .image], isTargeted: nil) { providers in drop(providers) }
                 HStack(spacing: 4) {
-                    LatchButton(title: "WHOLE BOARD", on: !mk.zoomToInlay) { mk.zoomToInlay = false }.frame(width: 110)
-                    LatchButton(title: "12TH FRET", on: mk.zoomToInlay) { mk.zoomToInlay = true }.frame(width: 90)
-                    LatchButton(title: "INLAY TOOLPATH", on: mk.showToolpath, tint: Theme.haze) { mk.showToolpath.toggle() }.frame(width: 120)
+                    ForEach(MarkerPreviewMode.allCases) { m in
+                        LatchButton(title: m.title, on: shown == m) { mode = m; presetToken += 1 }
+                            .frame(width: 96)
+                            .disabled(!available(m))
+                            .opacity(available(m) ? 1 : 0.4)
+                    }
                     Spacer()
-                    Text("Player's view: nut on the left, bass side at the top. Drop an image here to trace it.")
-                        .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
+                    if shown != .plan, mk.isStale(store, cnc: tp.settings) {
+                        Text("OUT OF DATE: GENERATE AGAIN").font(Theme.caption(10)).tracking(1).foregroundStyle(Theme.warn)
+                    }
                 }
-                .padding(.top, 8)
+                .padding(.bottom, 8)
+                switch shown {
+                case .plan:
+                    planView
+                case .dots3D:
+                    if let pl = mk.dotsPlayer, let j = mk.dotsJob {
+                        MarkerPlaybackView(player: pl, focus: nil, hudOffset: j.displayShift,
+                                           preset: $preset, presetToken: $presetToken)
+                    }
+                case .inlay3D:
+                    if let pl = mk.inlayPlayer, let j = mk.inlayJob {
+                        MarkerPlaybackView(player: pl, focus: inlayFocus, hudOffset: j.displayShift,
+                                           preset: $preset, presetToken: $presetToken)
+                    }
+                }
             }
             MarkerJobsPanel().frame(width: 330)
         }
@@ -52,6 +106,69 @@ struct MarkersView: View {
             return true
         }
         return false
+    }
+}
+
+enum MarkerPreviewMode: Int, CaseIterable, Identifiable {
+    case plan, dots3D, inlay3D
+    var id: Int { rawValue }
+    var title: String {
+        switch self {
+        case .plan: return "PLAN"
+        case .dots3D: return "3D DOTS"
+        case .inlay3D: return "3D INLAY"
+        }
+    }
+}
+
+/// 3D playback of a marker job on the board (with its pockets), reusing the board job's viewer and controls.
+struct MarkerPlaybackView: View {
+    @EnvironmentObject var store: ModelStore
+    let player: JobPlayer
+    let focus: (center: SIMD3<Double>, span: Double)?
+    let hudOffset: SIMD3<Double>
+    @Binding var preset: ViewPreset
+    @Binding var presetToken: Int
+    @State private var showRapids = true
+    @State private var showBoard = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            MarkerViewport(playback: player.playback, player: player, focus: focus, hudOffset: hudOffset,
+                           preset: preset, presetToken: presetToken, showRapids: showRapids, showBoard: showBoard)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(1)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .gmCard()
+            PlaybackBar(enabled: true, playback: player.playback, preset: $preset, presetToken: $presetToken,
+                        showRapids: $showRapids, showBoard: $showBoard)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(.top, 8)
+        }
+    }
+}
+
+/// Observes the playback clock so only the viewport redraws as time advances.
+private struct MarkerViewport: View {
+    @EnvironmentObject var store: ModelStore
+    @ObservedObject var playback: Playback
+    let player: JobPlayer
+    let focus: (center: SIMD3<Double>, span: Double)?
+    let hudOffset: SIMD3<Double>
+    let preset: ViewPreset
+    let presetToken: Int
+    let showRapids: Bool
+    let showBoard: Bool
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ToolpathViewer(toolpath: player.toolpath, layout: store.layout, mesh: store.mesh,
+                           version: player.version &* 1_000_003 &+ store.meshVersion,
+                           showRapids: showRapids, showBoard: showBoard, preset: preset, presetToken: presetToken,
+                           state: player.state(at: playback.time), focus: focus)
+            HUD(playback: playback, toolpath: player.toolpath, state: { player.state(at: $0) }, offset: hudOffset)
+                .padding(10)
+        }
     }
 }
 

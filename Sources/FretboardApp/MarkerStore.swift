@@ -9,13 +9,18 @@ import FretboardKit
 final class MarkerStore: ObservableObject {
     @Published var dots = DotCutSettings()
     @Published var inlay = InlayCutSettings()
-    @Published var trace = InlayTracer.Options() { didSet { if trace != oldValue { retrace() } } }
+    @Published var trace = InlayTracer.Options() { didSet { if trace != oldValue && !restoring { retrace() } } }
     @Published private(set) var sourceName = ""
     @Published private(set) var sourceImage: NSImage?
     @Published private(set) var dotsJob: MarkerJob?
     @Published private(set) var inlayJob: MarkerJob?
     @Published private(set) var isGenerating = false
     @Published private(set) var message: String?
+    /// Players for the 3D view of each job (rebuilt when the jobs are generated).
+    @Published private(set) var dotsPlayer: JobPlayer?
+    @Published private(set) var inlayPlayer: JobPlayer?
+    /// PNG of the grayscale source image, saved with the project.
+    @Published private(set) var imageData: Data?
     @Published var showToolpath = true
     @Published var zoomToInlay = true
 
@@ -24,6 +29,8 @@ final class MarkerStore: ObservableObject {
     }
     private var generatedKey: Key?
     private var gray: (bytes: [UInt8], w: Int, h: Int)?
+    private var restoring = false
+    private var generation = 0
     weak var model: ModelStore?
 
     func isStale(_ m: ModelStore, cnc: CNCSettings) -> Bool {
@@ -78,13 +85,14 @@ final class MarkerStore: ObservableObject {
     }
 
     func clearImage() {
-        sourceImage = nil; gray = nil; sourceName = ""
+        sourceImage = nil; gray = nil; sourceName = ""; imageData = nil
         model?.markers.inlay.artwork = nil
     }
 
     private func setImage(_ img: NSImage, name: String) {
         guard let g = Self.grayscale(img) else { message = "Could not read the image."; return }
         sourceImage = img; sourceName = name; gray = g; message = nil
+        imageData = Self.png(g)
         retrace(resetSize: true)
     }
 
@@ -132,6 +140,30 @@ final class MarkerStore: ObservableObject {
         return ok ? (bytes, w, h) : nil
     }
 
+    /// Restores the state saved in a project without re-tracing (the project carries the traced artwork).
+    func restore(image: ProjectFile.SourceImage?, trace t: InlayTracer.Options, dots d: DotCutSettings, inlay i: InlayCutSettings) {
+        restoring = true
+        defer { restoring = false }
+        trace = t; dots = d; inlay = i
+        message = nil
+        dotsJob = nil; inlayJob = nil; dotsPlayer = nil; inlayPlayer = nil; generatedKey = nil
+        if let image, let rep = NSBitmapImageRep(data: image.png) {
+            let img = NSImage(size: rep.size); img.addRepresentation(rep)
+            gray = Self.grayscale(img); sourceImage = img; sourceName = image.name; imageData = image.png
+        } else {
+            gray = nil; sourceImage = nil; sourceName = ""; imageData = nil
+        }
+    }
+
+    static func png(_ g: (bytes: [UInt8], w: Int, h: Int)) -> Data? {
+        guard let provider = CGDataProvider(data: Data(g.bytes) as CFData),
+              let cg = CGImage(width: g.w, height: g.h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: g.w,
+                               space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
+                               provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+        else { return nil }
+        return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+    }
+
     // MARK: Jobs
 
     func generate(_ m: ModelStore, cnc: CNCSettings) {
@@ -146,6 +178,9 @@ final class MarkerStore: ObservableObject {
                         MarkerToolpath.inlay(layout: L, markers: markers, settings: ins, cnc: cnc))
             }.value
             dotsJob = r.0; inlayJob = r.1
+            generation += 1
+            dotsPlayer = r.0.map { JobPlayer($0.displayToolpath, version: generation * 2) }
+            inlayPlayer = r.1.map { JobPlayer($0.displayToolpath, version: generation * 2 + 1) }
             generatedKey = k
             isGenerating = false
         }
@@ -159,4 +194,23 @@ final class MarkerStore: ObservableObject {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { try job.gcode.write(to: url, atomically: true, encoding: .utf8) } catch { NSAlert(error: error).runModal() }
     }
+}
+
+/// Simulated playback of one marker job, in the board job's machine coordinates.
+@MainActor
+final class JobPlayer: ObservableObject {
+    let toolpath: Toolpath
+    let times: [Double]
+    let version: Int
+    let playback = Playback()
+
+    init(_ tp: Toolpath, version: Int) {
+        toolpath = tp
+        times = tp.cumulativeTimes()
+        self.version = version
+        playback.speed = 10
+        playback.reset(total: times.last ?? 0)
+    }
+
+    func state(at t: Double) -> (index: Int, pos: SIMD3<Double>)? { toolpathState(toolpath, times: times, at: t) }
 }

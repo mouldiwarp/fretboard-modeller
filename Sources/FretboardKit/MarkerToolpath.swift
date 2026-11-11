@@ -2,7 +2,7 @@ import Foundation
 import simd
 
 /// Cutting settings for the dot pockets (normally the same 6 mm cutter as the main job).
-public struct DotCutSettings: Equatable, Sendable {
+public struct DotCutSettings: Equatable, Sendable, Codable {
     public var cutterDiameter = 6.0
     /// Each peck goes this much deeper before the cutter lifts to clear chips.
     public var peckDepth = 1.0
@@ -15,7 +15,7 @@ public struct DotCutSettings: Equatable, Sendable {
     public init() {}
 }
 
-public enum InlayOrigin: Int, CaseIterable, Sendable, Identifiable {
+public enum InlayOrigin: Int, CaseIterable, Sendable, Identifiable, Codable {
     /// Same origin as the board job: X0 heel edge, Y0 centre line, Z0 top of the original stock.
     case board
     /// X0/Y0 at the centre of the inlay, Z0 on the board surface at that point.
@@ -25,7 +25,7 @@ public enum InlayOrigin: Int, CaseIterable, Sendable, Identifiable {
 }
 
 /// Cutting settings for the custom inlay pocket with a small, fragile cutter.
-public struct InlayCutSettings: Equatable, Sendable {
+public struct InlayCutSettings: Equatable, Sendable, Codable {
     public var cutterDiameter = 0.9
     public var fluteLength = 9.0
     public var depthPerLayer = 0.3
@@ -56,12 +56,23 @@ public struct MarkerJob: Sendable {
     public var warnings: [String]
     /// Model X/Y of the job's X0/Y0.
     public var originOffset: SIMD2<Double>
+    /// Added to the job's coordinates to get the board job's machine coordinates (for showing it on the board).
+    public var displayShift: SIMD3<Double> = .zero
     /// Areas the cutter cannot reach (model coordinates), and their total area in mm².
     public var uncut: [[SIMD2<Double>]] = []
     public var uncutArea = 0.0
     public var pocketArea = 0.0
 
     public var gcode: String { GCodeWriter.write(toolpath, header: header) }
+
+    /// The toolpath moved into the board job's machine coordinates.
+    public var displayToolpath: Toolpath {
+        guard displayShift != .zero else { return toolpath }
+        var t = toolpath
+        t.start += displayShift
+        for i in t.moves.indices { t.moves[i].to += displayShift }
+        return t
+    }
 }
 
 public enum MarkerToolpath {
@@ -351,6 +362,7 @@ public enum MarkerToolpath {
         hd.append("; Estimated run time: " + GCodeWriter.formatTime(tp.totalTime))
         for w in warnings { hd.append("; WARNING: " + w) }
         return MarkerJob(toolpath: tp, header: hd, warnings: warnings, originOffset: off,
+                         displayShift: SIMD3(off.x, off.y, z0 - T),
                          uncut: uncutLoops, uncutArea: uncutArea, pocketArea: pocketArea)
     }
 }

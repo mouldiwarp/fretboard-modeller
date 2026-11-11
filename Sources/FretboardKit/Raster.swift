@@ -204,7 +204,7 @@ public enum Raster {
 
 /// Turns a grayscale image into inlay artwork.
 public enum InlayTracer {
-    public struct Options: Sendable, Equatable {
+    public struct Options: Sendable, Equatable, Codable {
         /// 0...1: pixels darker than this are part of the inlay (lighter ones with `invert`).
         public var threshold = 0.5
         public var invert = false

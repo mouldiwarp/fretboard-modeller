@@ -3,7 +3,7 @@ import simd
 
 /// CNC job settings. Machine coordinates: X/Y match the model (X0 = heel edge, Y0 = board centre line),
 /// Z0 = top of the stock, so cutting depths are negative.
-public struct CNCSettings: Equatable, Sendable {
+public struct CNCSettings: Equatable, Sendable, Codable {
     /// Flat end mill diameter.
     public var cutterDiameter = 6.0
 

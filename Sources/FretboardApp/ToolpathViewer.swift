@@ -26,6 +26,8 @@ struct ToolpathViewer: NSViewRepresentable {
     let preset: ViewPreset
     let presetToken: Int
     let state: (index: Int, pos: SIMD3<Double>)?
+    /// Frame the camera on this region (centre, size in mm) instead of the whole board.
+    var focus: (center: SIMD3<Double>, span: Double)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -53,7 +55,7 @@ struct ToolpathViewer: NSViewRepresentable {
         view.onResize = { [weak c, weak view] in
             guard let c, let f = c.lastFrame else { return }
             view?.resetUserMoved()
-            c.frame(preset: f.0, layout: f.1, T: f.2)
+            c.frame(preset: f.0, layout: f.1, T: f.2, focus: f.3)
         }
         return view
     }
@@ -62,13 +64,13 @@ struct ToolpathViewer: NSViewRepresentable {
         let c = context.coordinator
         if c.builtVersion != version {
             c.rebuild(toolpath: toolpath, layout: layout, mesh: mesh)
-            c.frame(preset: preset, layout: layout, T: toolpath.settings.stockThickness)
+            c.frame(preset: preset, layout: layout, T: toolpath.settings.stockThickness, focus: focus)
             c.builtVersion = version
             c.lastPresetToken = presetToken
         }
         if c.lastPresetToken != presetToken {
             c.lastPresetToken = presetToken
-            c.frame(preset: preset, layout: layout, T: toolpath.settings.stockThickness)
+            c.frame(preset: preset, layout: layout, T: toolpath.settings.stockThickness, focus: focus)
         }
         c.ghostNode.isHidden = !showBoard
         c.showRapids = showRapids
@@ -98,7 +100,7 @@ struct ToolpathViewer: NSViewRepresentable {
         var kinds: [MoveKind] = []
         var lastIndex = -1
         var lastShowRapids = true
-        var lastFrame: (ViewPreset, FretboardLayout, Double)?
+        var lastFrame: (ViewPreset, FretboardLayout, Double, (center: SIMD3<Double>, span: Double)?)?
 
         init() {
             [stockNode, ghostNode, pendingNode, chunkRoot, partialNode, toolNode].forEach { modelNode.addChildNode($0) }
@@ -193,12 +195,15 @@ struct ToolpathViewer: NSViewRepresentable {
             lastIndex = index
         }
 
-        func frame(preset: ViewPreset, layout L: FretboardLayout, T: Double) {
-            lastFrame = (preset, L, T)
-            let center = SIMD3<Double>(L.xEnd / 2, 0, -T / 2)
-            // Distance that shows the whole board across the view's width, whatever its aspect ratio.
+        func frame(preset: ViewPreset, layout L: FretboardLayout, T: Double, focus: (center: SIMD3<Double>, span: Double)? = nil) {
+            lastFrame = (preset, L, T, focus)
+            let center = focus?.center ?? SIMD3<Double>(L.xEnd / 2, 0, -T / 2)
+            let span = focus?.span ?? L.xEnd
+            // Distance that shows the whole span across the view's width, whatever its aspect ratio.
             let aspect = (view?.bounds.height ?? 0) > 0 ? Double(view!.bounds.width / view!.bounds.height) : 1.5
-            let d = max(max(L.xEnd, 120) * 1.7, L.xEnd * 0.6 / (tan(17.5 * .pi / 180) * max(aspect, 0.3)))
+            let d = focus == nil
+                ? max(max(L.xEnd, 120) * 1.7, L.xEnd * 0.6 / (tan(17.5 * .pi / 180) * max(aspect, 0.3)))
+                : span * 0.6 / (tan(17.5 * .pi / 180) * min(max(aspect, 0.3), 1.0))
             let dir: SIMD3<Double>, up: SIMD3<Double>
             switch preset {
             case .iso: dir = simd_normalize(SIMD3(-0.35, -0.85, 0.6)); up = SIMD3(0, 0, 1)
@@ -207,7 +212,7 @@ struct ToolpathViewer: NSViewRepresentable {
             case .heelEnd: dir = SIMD3(-1, 0, 0); up = SIMD3(0, 0, 1)
             case .nutEnd: dir = SIMD3(1, 0, 0); up = SIMD3(0, 0, 1)
             }
-            let dist = (preset == .heelEnd || preset == .nutEnd) ? 220 : d
+            let dist = (preset == .heelEnd || preset == .nutEnd) && focus == nil ? 220 : d
             func world(_ p: SIMD3<Double>) -> SCNVector3 { SCNVector3(p.x, p.z, -p.y) }
             cameraNode.position = world(center + dir * dist)
             view?.zoomTarget = world(center)

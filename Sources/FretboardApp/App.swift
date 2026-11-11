@@ -4,30 +4,49 @@ import UniformTypeIdentifiers
 import FretboardKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var project: ProjectController?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated { project?.confirmDiscard(action: "quitting") ?? true } ? .terminateNow : .terminateCancel
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.first else { return }
+        MainActor.assumeIsolated { project?.open(url: url) }
+    }
 }
 
 @main
 struct FretboardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @StateObject private var store = ModelStore()
-    @StateObject private var toolpath = ToolpathStore()
-    @StateObject private var markers = MarkerStore()
+    @StateObject private var project = ProjectController()
 
     var body: some Scene {
         // A single window: the tools are tabs inside it (see AppShell.swift).
         Window("Fretboard Modeller", id: "main") {
             AppShell()
-                .environmentObject(store)
-                .environmentObject(toolpath)
-                .environmentObject(markers)
+                .environmentObject(project)
+                .environmentObject(project.model)
+                .environmentObject(project.toolpath)
+                .environmentObject(project.markers)
+                .onAppear { delegate.project = project }
         }
         .defaultSize(width: 1560, height: 880)
         .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("New Project") { project.newProject() }.keyboardShortcut("n")
+                Button("Open…") { project.openWithPanel() }.keyboardShortcut("o")
+            }
+            CommandGroup(replacing: .saveItem) {
+                Button("Save") { project.save() }.keyboardShortcut("s")
+                Button("Save As…") { project.saveAs() }.keyboardShortcut("s", modifiers: [.command, .shift])
+            }
             CommandGroup(after: .sidebar) {
                 ForEach(AppTab.allCases) { tab in
                     Button(tab.title) { NotificationCenter.default.post(name: .selectTab, object: tab) }

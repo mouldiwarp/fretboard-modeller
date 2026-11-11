@@ -36,7 +36,7 @@ struct ToolpathView: View {
                 SummaryPanel().frame(width: 272)
             }
             .padding(10)
-            PlaybackBar(playback: tp.playback, preset: $preset, presetToken: $presetToken, showRapids: $showRapids, showBoard: $showBoard)
+            PlaybackBar(enabled: tp.toolpath != nil, playback: tp.playback, preset: $preset, presetToken: $presetToken, showRapids: $showRapids, showBoard: $showBoard)
         }
         .onAppear { if tp.toolpath == nil { tp.generate(params: store.params) } }
     }
@@ -75,7 +75,7 @@ struct ToolpathViewerInner: View {
             ToolpathViewer(toolpath: toolpath, layout: layout, mesh: MeshCache.mesh(for: params, layout: layout),
                            version: tp.version, showRapids: showRapids, showBoard: showBoard,
                            preset: preset, presetToken: presetToken, state: tp.state(at: playback.time))
-            HUD(playback: playback, toolpath: toolpath).padding(10)
+            HUD(playback: playback, toolpath: toolpath, state: { tp.state(at: $0) }).padding(10)
         }
     }
 }
@@ -94,12 +94,14 @@ enum MeshCache {
 }
 
 struct HUD: View {
-    @EnvironmentObject var tp: ToolpathStore
     @ObservedObject var playback: Playback
     let toolpath: Toolpath
+    let state: (Double) -> (index: Int, pos: SIMD3<Double>)?
+    /// Subtracted from positions so the readout shows the job's own coordinates.
+    var offset: SIMD3<Double> = .zero
 
     var body: some View {
-        let s = tp.state(at: playback.time)
+        let s = state(playback.time).map { (index: $0.index, pos: $0.pos - offset) }
         let move = s.map { toolpath.moves[$0.index] }
         VStack(alignment: .leading, spacing: 6) {
             if let move, let s {
@@ -296,7 +298,7 @@ struct SummaryPanel: View {
 // MARK: - Playback bar
 
 struct PlaybackBar: View {
-    @EnvironmentObject var tp: ToolpathStore
+    let enabled: Bool
     @ObservedObject var playback: Playback
     @Binding var preset: ViewPreset
     @Binding var presetToken: Int
@@ -304,7 +306,6 @@ struct PlaybackBar: View {
     @Binding var showBoard: Bool
 
     var body: some View {
-        let enabled = tp.toolpath != nil
         HStack(spacing: 12) {
             BigLampButton(title: playback.isPlaying ? "PAUSE" : "PLAY",
                           systemImage: playback.isPlaying ? "pause.fill" : "play.fill",

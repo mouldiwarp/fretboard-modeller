@@ -81,6 +81,10 @@ enum AppTab: String, CaseIterable, Identifiable {
 /// camera, settings and results while you work in another tab.
 struct AppShell: View {
     @EnvironmentObject var store: ModelStore
+    @EnvironmentObject var project: ProjectController
+    // Observed so the unsaved-changes marker updates when their settings change.
+    @EnvironmentObject var toolpathStore: ToolpathStore
+    @EnvironmentObject var markerStore: MarkerStore
     @State private var selection: AppTab = AppShell.launchTab
     @State private var opened: Set<AppTab> = [AppShell.launchTab]
 
@@ -110,6 +114,7 @@ struct AppShell: View {
         .foregroundStyle(Theme.text)
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
+        .navigationTitle(project.title + (project.isDirty ? " — Edited" : ""))
         .frame(minWidth: 1500, minHeight: 760)
         .onReceive(NotificationCenter.default.publisher(for: .selectTab)) { n in
             if let tab = n.object as? AppTab { select(tab) }
@@ -130,6 +135,11 @@ struct AppShell: View {
         HStack(spacing: 14) {
             FretboardGlyph().frame(width: 20, height: 16)
             Text("FRETBOARD MODELLER").font(Theme.headingBold(15)).tracking(2.5).foregroundStyle(Theme.offwhite)
+            HStack(spacing: 4) {
+                Text(project.title).font(Theme.heading(11.5)).foregroundStyle(Theme.text.opacity(0.85)).lineLimit(1)
+                if project.isDirty { LedDot(on: true, color: Theme.amber, size: 6).help("Unsaved changes (⌘S to save)") }
+            }
+            .frame(maxWidth: 160, alignment: .leading)
             HStack(spacing: 4) {
                 ForEach(AppTab.allCases) { tab in
                     TabButton(tab: tab, selected: tab == selection, enabled: tab.isEnabled(store)) { select(tab) }

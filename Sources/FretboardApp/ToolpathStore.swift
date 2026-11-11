@@ -93,17 +93,16 @@ final class ToolpathStore: ObservableObject {
 
     /// Index of the move in progress at time `t`, and the cutter position.
     func state(at t: Double) -> (index: Int, pos: SIMD3<Double>)? {
-        guard let tp = toolpath, !tp.moves.isEmpty else { return nil }
-        var lo = 0, hi = times.count - 1
-        while lo < hi {
-            let mid = (lo + hi) / 2
-            if times[mid] >= t { hi = mid } else { lo = mid + 1 }
-        }
-        let prevPos = lo == 0 ? tp.start : tp.moves[lo - 1].to
-        let t0 = lo == 0 ? 0 : times[lo - 1]
-        let dur = times[lo] - t0
-        let f = dur > 1e-12 ? min(1, max(0, (t - t0) / dur)) : 1
-        return (lo, prevPos + (tp.moves[lo].to - prevPos) * f)
+        guard let tp = toolpath else { return nil }
+        return toolpathState(tp, times: times, at: t)
+    }
+
+    /// Forgets the generated toolpath (for example after opening a project).
+    func clear() {
+        toolpath = nil; times = []; gcode = ""; summary = []
+        generatedParams = nil; generatedSettings = nil
+        playback.reset(total: 0)
+        version += 1
     }
 
     func exportGCode(params: FretboardParameters) {
@@ -114,4 +113,19 @@ final class ToolpathStore: ObservableObject {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { try gcode.write(to: url, atomically: true, encoding: .utf8) } catch { NSAlert(error: error).runModal() }
     }
+}
+
+/// Index of the move in progress at time `t` along `tp`, and the cutter position.
+func toolpathState(_ tp: Toolpath, times: [Double], at t: Double) -> (index: Int, pos: SIMD3<Double>)? {
+    guard !tp.moves.isEmpty, times.count == tp.moves.count else { return nil }
+    var lo = 0, hi = times.count - 1
+    while lo < hi {
+        let mid = (lo + hi) / 2
+        if times[mid] >= t { hi = mid } else { lo = mid + 1 }
+    }
+    let prevPos = lo == 0 ? tp.start : tp.moves[lo - 1].to
+    let t0 = lo == 0 ? 0 : times[lo - 1]
+    let dur = times[lo] - t0
+    let f = dur > 1e-12 ? min(1, max(0, (t - t0) / dur)) : 1
+    return (lo, prevPos + (tp.moves[lo].to - prevPos) * f)
 }

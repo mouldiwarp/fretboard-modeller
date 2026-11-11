@@ -27,7 +27,7 @@ public struct Pocket: Sendable, Equatable {
 
 /// String positions for locating the double dots: straight lines from the nut to the bridge with
 /// compensated spacing (equal gaps between the strings' edges).
-public struct StringSpacing: Sendable, Equatable {
+public struct StringSpacing: Sendable, Equatable, Codable {
     /// Distance from each board edge at the nut to the centre of the outer E strings.
     public var nutEdgeInset = 3.0
     /// Centre-to-centre span of the outer E strings at the bridge (Les Paul tune-o-matic).
@@ -62,7 +62,7 @@ public struct StringSpacing: Sendable, Equatable {
     }
 }
 
-public enum MarkerMode: Int, CaseIterable, Sendable, Identifiable {
+public enum MarkerMode: Int, CaseIterable, Sendable, Identifiable, Codable {
     case none, dots, dotsAndInlay, inlayOnly
     public var id: Int { rawValue }
     public var title: String {
@@ -78,14 +78,14 @@ public enum MarkerMode: Int, CaseIterable, Sendable, Identifiable {
 }
 
 /// Traced artwork, normalised to its bounding box: x and y run from -0.5 to 0.5 (y up).
-public struct InlayArtwork: Sendable, Equatable {
+public struct InlayArtwork: Sendable, Equatable, Codable {
     public var rings: [[SIMD2<Double>]]
     /// Width / height of the traced artwork.
     public var aspect: Double
     public init(rings: [[SIMD2<Double>]], aspect: Double) { self.rings = rings; self.aspect = aspect }
 }
 
-public struct InlayPlacement: Sendable, Equatable {
+public struct InlayPlacement: Sendable, Equatable, Codable {
     public var artwork: InlayArtwork?
     public var width = 40.0
     public var height = 20.0
@@ -104,7 +104,7 @@ public struct InlayPlacement: Sendable, Equatable {
 }
 
 /// Everything about fret markers that changes the model.
-public struct MarkerSettings: Sendable, Equatable {
+public struct MarkerSettings: Sendable, Equatable, Codable {
     public var mode: MarkerMode = .none
     public var dotDiameter = 6.0
     public var dotDepth = 3.0

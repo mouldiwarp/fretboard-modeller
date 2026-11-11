@@ -28,7 +28,13 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
 - **G-code** (two separate files):
   - *Dots* – the 6 mm cutter, peck-drilled (or spiralled out if a dot is wider than the cutter), using the board job's origin (X0 heel edge, Y0 centre line, Z0 top of the blank, blank thickness from the Toolpath tab). Run it after surfacing, while the board is still held by its tabs.
   - *Inlay* – a separate fine cutter (default 0.9 mm, 9 mm flutes). Zero on the board origin or on the **centre of the inlay** (Z0 = board surface there). Offset loops cut inside out on 0.3 mm layers; every entry ramps in along the path at 2°, the first loop after each entry runs at a reduced slot feed, and each layer ends with a light 0.05 mm finishing pass on the walls. Parts of the design narrower than the cutter are reported and shown in red.
+- **3D playback:** after GENERATE, switch the preview from PLAN to **3D DOTS** or **3D INLAY** to play either job on the board with a moving cutter and live X/Y/Z/feed readout (same controls as the Toolpath tab). 3D Inlay frames the 12th fret; readouts are in the job's own coordinates, so they match the file even with the inlay-centre zero.
 - Air-cut first with Z raised, then try scrap hardwood.
+
+## Projects
+- **File › New Project (⌘N), Open… (⌘O), Save (⌘S), Save As… (⇧⌘S).** A project is a `.fretboard` file (JSON) holding the board dimensions, the CNC settings, the markers, both marker jobs' settings, the trace options and the inlay image itself, so it opens on another Mac without the original image.
+- The project name is shown in the header and window title; an amber dot and “Edited” mean there are unsaved changes. New, Open and Quit ask before discarding them.
+- Generated toolpaths aren't saved; press GENERATE again after opening. Files from older versions open with defaults for anything they lack; files from a newer version are refused.
 
 ## Toolpath (CNC)
 The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 1000× with a moving cutter and live X/Y/Z/feed readout.
