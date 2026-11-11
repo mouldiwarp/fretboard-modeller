@@ -90,6 +90,10 @@ struct MarkersView: View {
             MarkerJobsPanel().frame(width: 330)
         }
         .padding(10)
+        .onChange(of: store.markers.mode) { m in
+            // A 12th-fret inlay with nothing loaded starts from the bundled default design.
+            if m.hasInlay, store.markers.inlay.artwork == nil, mk.sourceImage == nil { mk.useDefaultImage() }
+        }
         .onAppear {
             mk.model = store
             let a = CommandLine.arguments

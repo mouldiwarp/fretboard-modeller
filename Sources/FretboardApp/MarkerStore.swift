@@ -84,19 +84,39 @@ final class MarkerStore: ObservableObject {
         }
     }
 
+    /// Height (across the board) of the bundled default inlay.
+    static let defaultInlayHeight = 45.0
+
+    static let defaultInlayImage: NSImage? = {
+        let candidates = [
+            Bundle.main.url(forResource: "default-inlay", withExtension: "png"),
+            // `swift run` during development: use the copy in the repository.
+            URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .appendingPathComponent("../../Assets/default-inlay.png").standardized,
+        ]
+        return candidates.compactMap { $0 }.lazy.compactMap { NSImage(contentsOf: $0) }.first
+    }()
+
+    /// Traces the bundled default design, 45 mm tall, used when a 12th-fret inlay is chosen with no image.
+    func useDefaultImage() {
+        guard let img = Self.defaultInlayImage else { return }
+        setImage(img, name: "Default inlay", height: Self.defaultInlayHeight)
+    }
+
     func clearImage() {
         sourceImage = nil; gray = nil; sourceName = ""; imageData = nil
         model?.markers.inlay.artwork = nil
     }
 
-    private func setImage(_ img: NSImage, name: String) {
+    private func setImage(_ img: NSImage, name: String, height: Double? = nil) {
         guard let g = Self.grayscale(img) else { message = "Could not read the image."; return }
         sourceImage = img; sourceName = name; gray = g; message = nil
         imageData = Self.png(g)
-        retrace(resetSize: true)
+        retrace(resetSize: true, height: height)
     }
 
-    private func retrace(resetSize: Bool = false) {
+    /// `height`: start at this height (across the board) instead of the automatic size.
+    private func retrace(resetSize: Bool = false, height: Double? = nil) {
         guard let g = gray, let model else { return }
         guard let art = InlayTracer.trace(gray: g.bytes, width: g.w, height: g.h, options: trace) else {
             message = "Nothing to trace. Try another threshold, or Invert if the design is light on dark."
@@ -106,7 +126,11 @@ final class MarkerStore: ObservableObject {
         message = nil
         var m = model.markers
         m.inlay.artwork = art
-        if resetSize {
+        if resetSize, let h = height {
+            m.inlay.height = h
+            m.inlay.width = h * art.aspect
+            if m.mode == .none || m.mode == .dots { m.mode = .dotsAndInlay }
+        } else if resetSize {
             // Start at a size that fits comfortably across the 12th fret.
             let L = model.layout
             let maxW = 2 * L.taperHalfWidth(at: MarkerSettings.spaceCentreX(L, m.inlay.fret)) - 12

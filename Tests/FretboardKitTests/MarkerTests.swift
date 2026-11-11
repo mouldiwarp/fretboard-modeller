@@ -311,3 +311,12 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
     let r2 = lh.inlayRings(L)[0]
     for (p, q) in zip(ring, r2) { #expect(abs((p.x - c.x) + (q.x - c.x)) < 1e-9 && abs((p.y - c.y) + (q.y - c.y)) < 1e-9) }
 }
+
+/// The default inlay is 45 mm tall (across the board) at the 12th; its bounding box must fit with the margin.
+@Test func fortyFiveMillimetreInlayFitsAcrossTheTwelfth() {
+    let box = InlayArtwork(rings: [[SIMD2(-0.5, -0.5), SIMD2(0.5, -0.5), SIMD2(0.5, 0.5), SIMD2(-0.5, 0.5)]], aspect: 0.45)
+    let (L, m) = markers(.dotsAndInlay) { $0.inlay.artwork = box; $0.inlay.height = 45; $0.inlay.width = 45 * 0.45 }
+    let hw = L.taperHalfWidth(at: MarkerSettings.spaceCentreX(L, 12))
+    print("board width at 12th space:", 2 * hw)
+    #expect(m.validate(L).isEmpty, "\(m.validate(L))")
+}
