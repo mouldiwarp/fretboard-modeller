@@ -30,6 +30,8 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
   - *Dots* – the 6 mm cutter, peck-drilled (or spiralled out if a dot is wider than the cutter), using the board job's origin (X0 heel edge, Y0 centre line, Z0 top of the blank, blank thickness from the Toolpath tab). Run it after surfacing, while the board is still held by its tabs.
   - *Inlay* – a separate fine cutter (default 0.9 mm, 9 mm flutes). Zero on the board origin or on the **centre of the inlay** (Z0 = board surface there). Offset loops cut inside out on 0.3 mm layers; every entry ramps in along the path at 2°, the first loop after each entry runs at a reduced slot feed, and each layer ends with a light 0.05 mm finishing pass on the walls. Parts of the design narrower than the cutter are reported and shown in red.
 - **3D playback:** after GENERATE, switch the preview from PLAN to **3D DOTS** or **3D INLAY** to play either job on the board with a moving cutter and live X/Y/Z/feed readout (same controls as the Toolpath tab). 3D Inlay frames the 12th fret; readouts are in the job's own coordinates, so they match the file even with the inlay-centre zero.
+- **Checks:** pockets must stay 2 mm from the board edge and from each other. For the inlay this is measured on what the inlay cutter actually removes, so sharp tips it can't reach don't count. If a change makes the markers uncuttable, the reason is shown under GENERATE.
+- **Keeping G-code current:** changing the markers, the image or a job setting after generating marks the G-code out of date and shows an **UPDATE G-CODE** prompt. Exporting out-of-date G-code asks first (Update / Export Old G-code / Cancel).
 - Air-cut first with Z raised, then try scrap hardwood.
 
 ## Projects

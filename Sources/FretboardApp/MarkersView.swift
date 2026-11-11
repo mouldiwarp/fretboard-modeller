@@ -341,6 +341,42 @@ struct MarkerJobsPanel: View {
         Binding(get: { Double(b.wrappedValue) }, set: { b.wrappedValue = max(0, Int($0.rounded())) })
     }
 
+    /// Shown once the markers or job settings change after generating: offers to update the G-code.
+    private func staleNotice(canGenerate: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(canGenerate
+                  ? "The markers or job settings have changed since the G-code was generated. Update it before exporting or playing it back."
+                  : "The markers have changed since the G-code was generated, and can't be cut as they are. Fix the problem below, then update.",
+                  systemImage: "arrow.triangle.2.circlepath")
+                .font(Theme.heading(10.5)).foregroundStyle(Theme.warn)
+                .fixedSize(horizontal: false, vertical: true)
+            BigLampButton(title: mk.isGenerating ? "UPDATING…" : "UPDATE G-CODE", systemImage: "arrow.clockwise",
+                          tint: Theme.warn, enabled: canGenerate && !mk.isGenerating) { mk.generate(store, cnc: tp.settings) }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Theme.warn.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.warn.opacity(0.55), lineWidth: 1))
+    }
+
+    /// Exports, first asking what to do if the G-code no longer matches the markers.
+    private func export(_ job: MarkerJob?, name: String, stale: Bool, canGenerate: Bool) {
+        if stale {
+            let a = NSAlert()
+            a.messageText = "This G-code is out of date"
+            a.informativeText = canGenerate
+                ? "The markers or job settings changed after it was generated, so the file would not match the model. Update it, then export."
+                : "The markers or job settings changed after it was generated, and the current markers can't be cut. Exporting now writes the old G-code."
+            if canGenerate { a.addButton(withTitle: "Update") }
+            a.addButton(withTitle: "Export Old G-code")
+            a.addButton(withTitle: "Cancel")
+            let r = a.runModal()
+            if canGenerate && r == .alertFirstButtonReturn { mk.generate(store, cnc: tp.settings); return }
+            let exportOld: NSApplication.ModalResponse = canGenerate ? .alertSecondButtonReturn : .alertFirstButtonReturn
+            guard r == exportOld else { return }
+        }
+        mk.export(job, name: name)
+    }
+
     var body: some View {
         let stale = mk.isStale(store, cnc: tp.settings)
         let canGenerate = store.errors.isEmpty && store.markerErrors.isEmpty && store.markers.mode != .none
@@ -351,6 +387,12 @@ struct MarkerJobsPanel: View {
                                   enabled: canGenerate && !mk.isGenerating) { mk.generate(store, cnc: tp.settings) }
                     Spacer()
                     if stale { Text("OUT OF DATE").font(Theme.caption(10)).tracking(1).foregroundStyle(Theme.warn) }
+                }
+                if stale { staleNotice(canGenerate: canGenerate) }
+                // Why GENERATE is unavailable.
+                ForEach(store.errors + store.markerErrors, id: \.self) { e in
+                    Label(e, systemImage: "exclamationmark.triangle.fill")
+                        .font(Theme.heading(10.5)).foregroundStyle(Theme.danger)
                 }
                 Text(String(format: "Board-origin jobs use the board job's zero: X0 heel edge, Y0 centre line, Z0 top of the %.1f mm blank (set in the Toolpath tab). Run them after surfacing, before releasing the board from its tabs.",
                             tp.settings.stockThickness))
@@ -368,7 +410,8 @@ struct MarkerJobsPanel: View {
                     }
                     if let j = mk.dotsJob { summary(j) }
                     BigLampButton(title: "EXPORT DOTS G-CODE", systemImage: "square.and.arrow.up", enabled: mk.dotsJob != nil) {
-                        mk.export(mk.dotsJob, name: String(format: "fret_dots_%.0fmm.nc", store.params.scaleLength))
+                        export(mk.dotsJob, name: String(format: "fret_dots_%.0fmm.nc", store.params.scaleLength),
+                               stale: stale, canGenerate: canGenerate)
                     }
                 }
 
@@ -405,7 +448,8 @@ struct MarkerJobsPanel: View {
                         ForEach(j.warnings, id: \.self) { Text($0).font(Theme.heading(10.5)).foregroundStyle(Theme.warn) }
                     }
                     BigLampButton(title: "EXPORT INLAY G-CODE", systemImage: "square.and.arrow.up", enabled: mk.inlayJob != nil) {
-                        mk.export(mk.inlayJob, name: "fret\(store.markers.inlay.fret)_inlay_\(mk.inlay.origin == .board ? "board" : "centre")_zero.nc")
+                        export(mk.inlayJob, name: "fret\(store.markers.inlay.fret)_inlay_\(mk.inlay.origin == .board ? "board" : "centre")_zero.nc",
+                               stale: stale, canGenerate: canGenerate)
                     }
                     Text("Fragile cutter: every entry ramps in along the path, the first loop after each entry runs at the slot feed, and each layer ends with a light finishing pass on the walls. Air-cut first with Z raised.")
                         .font(Theme.heading(10)).foregroundStyle(Theme.dim)

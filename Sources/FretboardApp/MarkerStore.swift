@@ -8,7 +8,7 @@ import FretboardKit
 @MainActor
 final class MarkerStore: ObservableObject {
     @Published var dots = DotCutSettings()
-    @Published var inlay = InlayCutSettings()
+    @Published var inlay = InlayCutSettings() { didSet { model?.inlayCutter = inlay.cutterDiameter } }
     @Published var trace = InlayTracer.Options() { didSet { if trace != oldValue && !restoring { retrace() } } }
     @Published private(set) var sourceName = ""
     @Published private(set) var sourceImage: NSImage?
@@ -31,7 +31,7 @@ final class MarkerStore: ObservableObject {
     private var gray: (bytes: [UInt8], w: Int, h: Int)?
     private var restoring = false
     private var generation = 0
-    weak var model: ModelStore?
+    weak var model: ModelStore? { didSet { model?.inlayCutter = inlay.cutterDiameter } }
 
     func isStale(_ m: ModelStore, cnc: CNCSettings) -> Bool {
         (dotsJob != nil || inlayJob != nil) && generatedKey != key(m, cnc)

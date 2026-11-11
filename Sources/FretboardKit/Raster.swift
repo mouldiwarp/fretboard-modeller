@@ -125,6 +125,21 @@ public enum Raster {
 
     /// Euclidean distance (world units) from every cell with value > 0.5 to the nearest cell ≤ 0.5. Outside cells get 0.
     /// The boundary lies half a cell beyond the last inside cell, so half a cell is taken off (conservative).
+    /// Outline of what a cutter of radius `r` actually removes from the even-odd region `rings`: every point
+    /// within r of a place where the whole cutter fits. Narrow parts (sharp tips, thin strokes) drop out.
+    public static func cutRegion(_ rings: [[SIMD2<Double>]], radius r: Double, cell h: Double) -> [[SIMD2<Double>]] {
+        guard r > 0, !rings.isEmpty else { return rings }
+        let mask = rasterize(rings, cell: h, pad: Int(ceil(r / h)) + 4)
+        let dist = distanceInside(mask)
+        let reach = edt(dist) { Double($0) >= r - 1e-9 }
+        var cut = Grid2D(w: mask.w, h: mask.h, origin: mask.origin, cell: h)
+        var any = false
+        for k in 0..<mask.values.count where mask.values[k] > 0.5 && Double(reach.values[k]) <= r + h {
+            cut.values[k] = 1; any = true
+        }
+        return any ? contours(cut, level: 0.5) : []
+    }
+
     public static func distanceInside(_ mask: Grid2D) -> Grid2D {
         var d = edt(mask) { $0 <= 0.5 }
         let half = Float(mask.cell / 2)

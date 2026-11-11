@@ -69,6 +69,8 @@ final class ModelStore: ObservableObject {
     @Published var markers = MarkerSettings() { didSet { if markers != oldValue { scheduleRebuild() } } }
     @Published private(set) var markerErrors: [String] = []
     @Published private(set) var markerWarnings: [String] = []
+    /// Diameter of the inlay cutter: the inlay's clearance checks use what it can actually cut.
+    @Published var inlayCutter: Double? { didSet { if inlayCutter != oldValue { scheduleRebuild() } } }
     /// Number of pockets in the current mesh.
     @Published private(set) var pocketCount = 0
     /// Increments each time a new mesh is applied, so the viewer knows to rebuild.
@@ -93,7 +95,7 @@ final class ModelStore: ObservableObject {
         guard errs.isEmpty else { return }
         let mk = markers
         let probe = FretboardLayout(p)
-        markerErrors = mk.validate(probe)
+        markerErrors = mk.validate(probe, inlayCutter: inlayCutter)
         markerWarnings = mk.warnings(probe)
         let pockets = markerErrors.isEmpty ? mk.pockets(probe) : []
         task = Task {

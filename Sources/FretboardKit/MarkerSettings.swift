@@ -188,7 +188,9 @@ public struct MarkerSettings: Sendable, Equatable, Codable {
 
     // MARK: Checks
 
-    public func validate(_ L: FretboardLayout) -> [String] {
+    /// `inlayCutter`: diameter of the inlay cutter. When given, the inlay's clearances are measured on what that
+    /// cutter actually removes, so sharp tips it can't reach don't count as being too close to the edge.
+    public func validate(_ L: FretboardLayout, inlayCutter: Double? = nil) -> [String] {
         var e: [String] = []
         if mode == .none { return e }
         if mode.hasDots {
@@ -200,7 +202,11 @@ public struct MarkerSettings: Sendable, Equatable, Codable {
             if inlay.fret < 1 || inlay.fret > L.params.fretCount { e.append("The inlay fret is not on the board.") }
         }
         guard e.isEmpty else { return e }
-        let ps = pockets(L)
+        var ps = pockets(L)
+        if let d = inlayCutter, d > 0, mode.hasInlay, let i = ps.lastIndex(where: { if case .contoured = $0.floor { return true }; return false }) {
+            let cut = Raster.cutRegion(ps[i].rings, radius: d / 2, cell: min(0.05, d / 8))
+            if cut.isEmpty { ps.remove(at: i) } else { ps[i].rings = cut }
+        }
         let minX = L.notchDepth + edgeMargin, maxX = L.xNut - edgeMargin
         var outside = false, tooDeep = false
         for p in ps {

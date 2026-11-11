@@ -320,3 +320,26 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
     print("board width at 12th space:", 2 * hw)
     #expect(m.validate(L).isEmpty, "\(m.validate(L))")
 }
+
+/// The edge clearance is measured on what the inlay cutter actually removes: a spike too thin for the cutter
+/// may run closer to the edge than the margin, but a wide part may not.
+@Test func edgeClearanceIgnoresTipsTheCutterCannotReach() {
+    func shape(spikeTo tip: Double, halfWidth w: Double) -> InlayArtwork {
+        InlayArtwork(rings: [[SIMD2(-5, -5), SIMD2(5, -5), SIMD2(5, 5), SIMD2(w, 5), SIMD2(0, tip),
+                              SIMD2(-w, 5), SIMD2(-5, 5)]], aspect: 1)
+    }
+    let (L, base) = markers(.inlayOnly)
+    let hw = L.taperHalfWidth(at: MarkerSettings.spaceCentreX(L, 12))
+    func settings(_ art: InlayArtwork) -> MarkerSettings {
+        var m = base; m.inlay.artwork = art; m.inlay.width = 1; m.inlay.height = 1; return m
+    }
+    // A needle (0.4 mm wide at its base) reaching 1.4 mm from the edge.
+    let needle = settings(shape(spikeTo: hw - 1.4, halfWidth: 0.2))
+    #expect(!needle.validate(L).isEmpty)
+    #expect(needle.validate(L, inlayCutter: 0.9).isEmpty, "\(needle.validate(L, inlayCutter: 0.9))")
+    // A blunt, flat-ended bar (4 mm wide) reaching 1.4 mm from the edge is still too close.
+    let t = hw - 1.4
+    let lobe = settings(InlayArtwork(rings: [[SIMD2(-5, -5), SIMD2(5, -5), SIMD2(5, 5), SIMD2(2, 5), SIMD2(2, t),
+                                              SIMD2(-2, t), SIMD2(-2, 5), SIMD2(-5, 5)]], aspect: 1))
+    #expect(!lobe.validate(L, inlayCutter: 0.9).isEmpty)
+}
