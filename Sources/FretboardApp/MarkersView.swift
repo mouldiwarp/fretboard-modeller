@@ -43,7 +43,9 @@ struct MarkersView: View {
                 LatchButton(title: "12TH FRET", on: mk.zoomToInlay) { mk.zoomToInlay = true }.frame(width: 90)
                 LatchButton(title: "INLAY TOOLPATH", on: mk.showToolpath, tint: Theme.haze) { mk.showToolpath.toggle() }.frame(width: 120)
                 Spacer()
-                Text("Player's view: nut on the left, bass side at the top. Drop an image here to trace it.")
+                Text(store.markers.strings.trebleOnPlusY
+                     ? "Left-handed board seen from above: nut on the left, bass side at the top. Drop an image here to trace it."
+                     : "Seen from above as in the Designer: nut on the right, bass side at the top. Drop an image here to trace it.")
                     .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
             }
             .padding(.top, 8)
@@ -252,7 +254,7 @@ struct MarkerSetupPanel: View {
                 .textFieldStyle(.plain).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.amber)
                 .padding(.horizontal, 6).padding(.vertical, 3).frame(width: 180).gmWell()
             }
-            LampCheck(text: "Treble side is +Y", on: m.strings.trebleOnPlusY,
+            LampCheck(text: "Left-handed board (treble side +Y)", on: m.strings.trebleOnPlusY,
                       detail: "Compensated spacing; the double dots sit under the B and A strings.")
         }
     }
@@ -421,7 +423,8 @@ struct MarkerJobsPanel: View {
 
 // MARK: - Preview
 
-/// Plan view of the board in the player's view (nut left, bass side up) with frets, strings, pockets,
+/// Plan view of the board from above, bass side up (for a right-handed board this is the Designer's top
+/// view: heel left, nut right) with frets, strings, pockets,
 /// the inlay toolpath and areas the cutter cannot reach.
 struct MarkerPreview: View {
     let layout: FretboardLayout
@@ -432,7 +435,7 @@ struct MarkerPreview: View {
     var body: some View {
         Canvas { ctx, size in
             let L = layout
-            let t = markers.strings.trebleOnPlusY ? 1.0 : -1.0
+            let v = markers.viewSign
             let n = L.params.fretCount
             let f = min(max(markers.inlay.fret, 2), n)
             let xHi = zoom ? L.fretX(max(0, f - 3)) + 3 : L.xEnd + 4
@@ -440,7 +443,9 @@ struct MarkerPreview: View {
             let yHalf = zoom ? L.taperHalfWidth(at: L.fretX(f)) + 4 : L.taperHalfWidth(at: 0) + 6
             let k = min((size.width - 24) / (xHi - xLo), (size.height - 30) / (2 * yHalf))
             let ox = (size.width - (xHi - xLo) * k) / 2
-            func pt(_ p: SIMD2<Double>) -> CGPoint { CGPoint(x: ox + (xHi - p.x) * k, y: size.height / 2 + t * p.y * k) }
+            func pt(_ p: SIMD2<Double>) -> CGPoint {
+                CGPoint(x: ox + (v > 0 ? p.x - xLo : xHi - p.x) * k, y: size.height / 2 - v * p.y * k)
+            }
             func path(_ rings: [[SIMD2<Double>]]) -> Path {
                 var pa = Path()
                 for r in rings where r.count > 2 {
@@ -460,7 +465,7 @@ struct MarkerPreview: View {
                 var p = Path(); p.move(to: pt(SIMD2(x, -hw))); p.addLine(to: pt(SIMD2(x, hw)))
                 ctx.stroke(p, with: .color(i == 0 ? Theme.offwhite : Color(white: 0.75).opacity(0.7)), lineWidth: i == 0 ? 2.5 : 1)
                 if i >= 1 {
-                    let c = pt(SIMD2(MarkerSettings.spaceCentreX(L, i), -t * (L.taperHalfWidth(at: x) + 2.5)))
+                    let c = pt(SIMD2(MarkerSettings.spaceCentreX(L, i), v * (L.taperHalfWidth(at: x) + 2.5)))
                     ctx.draw(Text("\(i)").font(.system(size: 9, design: .monospaced)).foregroundColor(Theme.dim), at: c)
                 }
             }

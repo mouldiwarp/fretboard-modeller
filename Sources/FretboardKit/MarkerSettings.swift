@@ -34,8 +34,9 @@ public struct StringSpacing: Sendable, Equatable, Codable {
     public var bridgeSpan = 52.4
     /// Gauges in inches, high E (1st) to low E (6th).
     public var gauges: [Double] = [0.010, 0.013, 0.017, 0.026, 0.036, 0.046]
-    /// The treble (high E) side is +Y in the model.
-    public var trebleOnPlusY = true
+    /// The treble (high E) side is +Y in the model. False (bass at +Y) is a right-handed board: in the
+    /// Designer's view (heel left, nut right, +Y at the back) the bass side is at the top, as an audience sees it.
+    public var trebleOnPlusY = false
 
     public init() {}
 
@@ -92,11 +93,11 @@ public struct InlayPlacement: Sendable, Equatable, Codable {
     public var lockAspect = true
     /// Fret space the inlay is centred on (the 12th).
     public var fret = 12
-    /// Shift from the centre of the fret space, in the player's view: + toward the body.
+    /// Shift from the centre of the fret space: + toward the body.
     public var offsetAlong = 0.0
     /// Shift across the board: + toward the bass side.
     public var offsetAcross = 0.0
-    /// Rotation in degrees, counter-clockwise in the player's view.
+    /// Rotation in degrees, counter-clockwise in the plan view (see `MarkerSettings.viewSign`).
     public var rotation = 0.0
     public var mirror = false
     public var depth = 3.0
@@ -143,25 +144,29 @@ public struct MarkerSettings: Sendable, Equatable, Codable {
         return out
     }
 
+    /// The plan view the inlay is drawn and read in: the board seen from above with the bass side at the top,
+    /// as an audience sees it. +1 when bass is +Y (right-handed): the Designer's top view, heel left, nut right.
+    /// -1 (left-handed): that view turned half a turn, nut left. View right = viewSign * X, view up = viewSign * Y.
+    public var viewSign: Double { strings.trebleOnPlusY ? -1 : 1 }
+
     /// Centre of the inlay in model coordinates.
     public func inlayCentre(_ L: FretboardLayout) -> SIMD2<Double> {
-        let t = strings.trebleOnPlusY ? 1.0 : -1.0
-        // Player's view: nut on the left, body on the right (-X), bass side up (-Y when treble is +Y).
-        return SIMD2(Self.spaceCentreX(L, inlay.fret) - inlay.offsetAlong, -t * inlay.offsetAcross)
+        // The body is toward -X; the bass side is viewSign * Y.
+        SIMD2(Self.spaceCentreX(L, inlay.fret) - inlay.offsetAlong, viewSign * inlay.offsetAcross)
     }
 
     /// The artwork rings placed on the board (model coordinates, mm).
     public func inlayRings(_ L: FretboardLayout) -> [[SIMD2<Double>]] {
         guard mode.hasInlay, let art = inlay.artwork, inlay.fret >= 1, inlay.fret <= L.params.fretCount else { return [] }
         let c = inlayCentre(L)
-        let t = strings.trebleOnPlusY ? 1.0 : -1.0
+        let v = viewSign
         let th = inlay.rotation * Double.pi / 180
         let cs = cos(th), sn = sin(th)
         return art.rings.map { ring in
             ring.map { u -> SIMD2<Double> in
                 let a0 = u.x * inlay.width * (inlay.mirror ? -1 : 1), b0 = u.y * inlay.height
                 let a = a0 * cs - b0 * sn, b = a0 * sn + b0 * cs     // view coordinates: a right, b up
-                return SIMD2(c.x - a, c.y - t * b)
+                return SIMD2(c.x + v * a, c.y + v * b)
             }
         }
     }

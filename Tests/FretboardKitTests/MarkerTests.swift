@@ -20,7 +20,8 @@ func testArtwork() -> InlayArtwork {
 
 @Test func compensatedSpacingSpansTheOuterStrings() {
     let s = StringSpacing()
-    let o = s.offsets(span: 52.4)
+    // Right-handed by default: high E (string 1) on -Y, low E on +Y.
+    let o = s.offsets(span: 52.4).map { -$0 }
     #expect(o.count == 6)
     #expect(abs(o[0] - 26.2) < 1e-9 && abs(o[5] + 26.2) < 1e-9)
     // Equal gaps between string edges.
@@ -36,12 +37,12 @@ func testArtwork() -> InlayArtwork {
     let x12 = MarkerSettings.spaceCentreX(L, 12)
     let twelve = dots.filter { abs($0.x - x12) < 1e-9 }
     #expect(twelve.count == 2)
-    // B (treble side, +Y) and A (bass side), almost symmetric (string gauges shift them slightly).
+    // B (treble side, -Y) and A (bass side, +Y), almost symmetric (string gauges shift them slightly).
     let ys = twelve.map(\.y).sorted()
     #expect(ys[0] < -5 && ys[1] > 5)
     // Compensated spacing pushes the pair toward the treble side by half the gauge differences.
     let g = m.strings.gauges.map { $0 * 25.4 }
-    #expect(abs((ys[0] + ys[1]) - ((g[5] - g[0]) / 2 + (g[4] - g[1]) / 2)) < 1e-9)
+    #expect(abs((ys[0] + ys[1]) + ((g[5] - g[0]) / 2 + (g[4] - g[1]) / 2)) < 1e-9)
     let x3 = MarkerSettings.spaceCentreX(L, 3)
     #expect(abs(x3 - (L.fretX(2) + L.fretX(3)) / 2) < 1e-12)
     #expect(dots.contains { abs($0.x - x3) < 1e-9 && $0.y == 0 })
@@ -284,4 +285,29 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
     #expect(abs(reach - 1) < 1e-6)
     var small = m; small.dotDiameter = 5
     #expect(MarkerToolpath.dots(layout: L, markers: small, settings: DotCutSettings(), cnc: cnc) == nil)
+}
+
+/// A right-handed board by default: bass side at +Y, so the Designer's view (heel left, nut right, +Y at the
+/// back) shows it as an audience sees it, and the inlay reads upright there. Left-handed turns it half a turn.
+@Test func defaultBoardIsRightHandedAndInlayReadsUprightInTheDesigner() {
+    // Artwork: an "L" — a tall bar on the left and a foot along the bottom.
+    let art = InlayArtwork(rings: [[SIMD2(-0.5, -0.5), SIMD2(0.5, -0.5), SIMD2(0.5, -0.3), SIMD2(-0.3, -0.3),
+                                     SIMD2(-0.3, 0.5), SIMD2(-0.5, 0.5)]], aspect: 1)
+    let (L, m) = markers(.inlayOnly) { $0.inlay.artwork = art; $0.inlay.width = 10; $0.inlay.height = 10 }
+    #expect(!m.strings.trebleOnPlusY)
+    // High E (treble) on -Y, low E (bass) on +Y.
+    #expect(m.strings.y(string: 1, fromNut: 300, layout: L) < 0)
+    #expect(m.strings.y(string: 6, fromNut: 300, layout: L) > 0)
+    let c = m.inlayCentre(L)
+    let ring = m.inlayRings(L)[0]
+    // Top of the bar (artwork +y) is toward +Y; the foot (artwork +x) runs toward +X, the nut.
+    #expect(ring[4].y > c.y + 4 && ring[4].x < c.x)
+    #expect(ring[1].x > c.x + 4 && ring[1].y < c.y)
+    // Moving toward the bass goes to +Y.
+    var m2 = m; m2.inlay.offsetAcross = 3
+    #expect(abs(m2.inlayCentre(L).y - 3) < 1e-9)
+    // Left-handed: half a turn.
+    var lh = m; lh.strings.trebleOnPlusY = true
+    let r2 = lh.inlayRings(L)[0]
+    for (p, q) in zip(ring, r2) { #expect(abs((p.x - c.x) + (q.x - c.x)) < 1e-9 && abs((p.y - c.y) + (q.y - c.y)) < 1e-9) }
 }
