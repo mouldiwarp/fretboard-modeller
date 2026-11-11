@@ -9,6 +9,9 @@ func opColor(_ op: CutOperation) -> NSColor {
     case .roughOutline: return NSColor(srgbRed: 1.0, green: 0xB5 / 255, blue: 0x4A / 255, alpha: 1)          // amber
     case .finishSurface: return NSColor(srgbRed: 0x86 / 255, green: 0xA2 / 255, blue: 0xBD / 255, alpha: 1)  // haze
     case .finishOutline: return NSColor(srgbRed: 0x9B / 255, green: 0xD8 / 255, blue: 0x6A / 255, alpha: 1)  // green
+    case .dotPocket: return NSColor(srgbRed: 1.0, green: 0xB5 / 255, blue: 0x4A / 255, alpha: 1)
+    case .inlayClear: return NSColor(srgbRed: 0xC5 / 255, green: 0xA0 / 255, blue: 0x59 / 255, alpha: 1)
+    case .inlayFinish: return NSColor(srgbRed: 0x9B / 255, green: 0xD8 / 255, blue: 0x6A / 255, alpha: 1)
     }
 }
 

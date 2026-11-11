@@ -19,6 +19,13 @@ public enum GCodeWriter {
         out.append(String(format: "; Outline direction: %@; %d tabs", s.climbOutline ? "climb (counter-clockwise)" : "conventional (clockwise)", s.tabCount))
         out.append(String(format: "; Feeds: X/Y %.0f, Z %.0f, rapid %.0f mm/min", s.xyFeed, s.zFeed, s.rapidFeed))
         out.append(String(format: "; Estimated run time: %@", formatTime(t.totalTime)))
+        return write(t, header: out)
+    }
+
+    /// Writes the moves with the given comment lines (each starting with "; ") as the header.
+    public static func write(_ t: Toolpath, header: [String]) -> String {
+        let s = t.settings
+        var out = header
         out.append("G21        ; millimetres")
         out.append("G90        ; absolute positioning")
         out.append("G17        ; XY plane")

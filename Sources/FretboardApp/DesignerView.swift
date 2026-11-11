@@ -2,9 +2,9 @@ import SwiftUI
 import simd
 import FretboardKit
 
-struct ContentView: View {
+/// The Designer tab: parametric fretboard solid, viewer, measurements and STL export.
+struct DesignerView: View {
     @EnvironmentObject var store: ModelStore
-    @Environment(\.openWindow) private var openWindow
     @State private var preset: ViewPreset = .iso
     @State private var presetToken = 0
     @State private var showFrets = true
@@ -13,7 +13,6 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TopBar()
             HStack(alignment: .top, spacing: 10) {
                 SetupPanel().frame(width: 304)
                 ViewerPanel(preset: $preset, presetToken: $presetToken, picks: $picks,
@@ -24,28 +23,17 @@ struct ContentView: View {
             BottomBar(preset: $preset, presetToken: $presetToken,
                       showFrets: $showFrets, showDimensions: $showDimensions)
         }
-        .background(Backdrop())
-        .background(WindowTint())
-        .foregroundStyle(Theme.text)
-        .tint(Theme.accent)
-        .preferredColorScheme(.dark)
-        .frame(minWidth: 1180, minHeight: 760)
-        .onAppear { if CommandLine.arguments.contains("--toolpath") { openWindow(id: "toolpath") } }
     }
 }
 
-// MARK: - Top bar
+// MARK: - Status (shown in the shell's header while this tab is selected)
 
-struct TopBar: View {
+struct DesignerStatus: View {
     @EnvironmentObject var store: ModelStore
 
     var body: some View {
         let ok = store.errors.isEmpty
         HStack(spacing: 10) {
-            FretboardGlyph().frame(width: 20, height: 16)
-            Text("FRETBOARD MODELLER").font(Theme.headingBold(15)).tracking(2.5).foregroundStyle(Theme.offwhite)
-            Text("Parametric fretboard STL").font(Theme.heading(11.5)).foregroundStyle(Theme.dim)
-            Spacer()
             LedDot(on: true, color: ok ? Theme.ok : Theme.danger)
             Text(ok ? "MODEL VALID" : "CHECK INPUTS")
                 .font(Theme.caption(10.5)).tracking(1)
@@ -53,10 +41,6 @@ struct TopBar: View {
             LedReadout(text: String(format: "%.1f mm", store.measurements.overallLength))
             LedReadout(text: "\(store.params.fretCount) FRETS", color: Theme.haze)
         }
-        .padding(.horizontal, 14)
-        .frame(height: 38)
-        .background(Theme.obsidian.opacity(0.88))
-        .overlay(alignment: .bottom) { Rectangle().fill(Theme.gold.opacity(0.4)).frame(height: 1) }
     }
 }
 
@@ -64,7 +48,6 @@ struct TopBar: View {
 
 struct BottomBar: View {
     @EnvironmentObject var store: ModelStore
-    @Environment(\.openWindow) private var openWindow
     @Binding var preset: ViewPreset
     @Binding var presetToken: Int
     @Binding var showFrets: Bool
@@ -86,9 +69,6 @@ struct BottomBar: View {
             Spacer()
             Text("Drag to orbit · ⌘ + scroll or pinch to zoom · click two points to measure")
                 .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
-            BigLampButton(title: "FRET TEMPLATE", systemImage: "ruler", tint: Theme.haze, lit: false) { openWindow(id: "template") }
-            BigLampButton(title: "TOOLPATH", systemImage: "scope", tint: Theme.haze, lit: false,
-                          enabled: store.errors.isEmpty) { openWindow(id: "toolpath") }
             BigLampButton(title: "EXPORT STL", systemImage: "square.and.arrow.up",
                           enabled: store.errors.isEmpty) { store.exportSTL() }
         }

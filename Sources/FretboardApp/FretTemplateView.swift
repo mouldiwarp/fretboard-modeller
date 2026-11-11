@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 import FretboardKit
 
 /// The fret-slot jig template tool: marker-hole G-code for locating fret slots on a chop saw jig.
-struct FretTemplateWindow: View {
+struct FretTemplateView: View {
     @EnvironmentObject var store: ModelStore
     @State private var scaleLength = FretboardParameters().scaleLength
     @State private var fretCount = FretboardParameters().fretCount
@@ -16,24 +16,6 @@ struct FretTemplateWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                FretboardGlyph().frame(width: 20, height: 16)
-                Text("FRET TEMPLATE").font(Theme.headingBold(15)).tracking(2.5).foregroundStyle(Theme.offwhite)
-                Text("Chop-saw jig · marker-hole G-code").font(Theme.heading(11.5)).foregroundStyle(Theme.dim)
-                Spacer()
-                LedReadout(text: "\(fretCount) FRETS")
-                LatchButton(title: "← DESIGNER", on: false, height: 22) {
-                    let w = NSApp.keyWindow
-                    w?.close()
-                    NSApp.windows.first { $0 !== w && $0.canBecomeMain && $0.isVisible }?.makeKeyAndOrderFront(nil)
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-                .frame(width: 110)
-            }
-            .padding(.horizontal, 14).frame(height: 38)
-            .background(Theme.obsidian.opacity(0.88))
-            .overlay(alignment: .bottom) { Rectangle().fill(Theme.gold.opacity(0.4)).frame(height: 1) }
-
             HStack(alignment: .top, spacing: 10) {
                 settingsPanel.frame(width: 290)
                 tablePanel.frame(width: 330)
@@ -41,12 +23,6 @@ struct FretTemplateWindow: View {
             }
             .padding(10)
         }
-        .background(Backdrop())
-        .background(WindowTint())
-        .foregroundStyle(Theme.text)
-        .tint(Theme.accent)
-        .preferredColorScheme(.dark)
-        .frame(minWidth: 1080, minHeight: 640)
         .onAppear { if !synced { syncFromDesigner(); synced = true } }
     }
 

@@ -13,12 +13,13 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <h1>Fretboard Modeller</h1><div class="sub">User guide – design a fretboard, machine it, and cut the fret slots</div>
 
 <h2>1. Overview</h2>
-<p>Fretboard Modeller has three tools that share one set of board dimensions:</p>
+<p>Fretboard Modeller has four tools that share one set of board dimensions:</p>
 <table><tr><th>Tool</th><th>Opened from</th><th>Produces</th></tr>
-<tr><td><b>Designer</b></td><td>Main window</td><td>3D fretboard, measurements, binary <code>.stl</code> (mm)</td></tr>
-<tr><td><b>Toolpath</b></td><td>TOOLPATH button</td><td>WorkBee Z1+ G-code (<code>.nc</code>) with animated playback</td></tr>
-<tr><td><b>Fret Template</b></td><td>FRET TEMPLATE button</td><td>Marker-hole G-code for the chop-saw fret slot jig</td></tr></table>
-<p>Launch it from Spotlight (⌘ Space, “Fretboard Modeller”) after running <code>./make_app.sh</code>. Both secondary windows have a <b>← DESIGNER</b> button that closes them and returns you to the main window.</p>
+<tr><td><b>Designer</b></td><td>Tab 1 (⌘1)</td><td>3D fretboard, measurements, binary <code>.stl</code> (mm)</td></tr>
+<tr><td><b>Markers</b></td><td>Tab 2 (⌘2)</td><td>Fret dots and a traced 12th-fret inlay in the model, plus their own G-code files</td></tr>
+<tr><td><b>Toolpath</b></td><td>Tab 3 (⌘3)</td><td>WorkBee Z1+ G-code (<code>.nc</code>) with animated playback</td></tr>
+<tr><td><b>Fret Template</b></td><td>Tab 4 (⌘4)</td><td>Marker-hole G-code for the chop-saw fret slot jig</td></tr></table>
+<p>Launch it from Spotlight (⌘ Space, “Fretboard Modeller”) after running <code>./make_app.sh</code>. The four tools are tabs along the top of the one window (⌘1 Designer, ⌘2 Markers, ⌘3 Toolpath, ⌘4 Fret Template). Toolpath is unavailable while the Designer inputs are invalid.</p>
 
 <h2>2. Designer</h2>
 <img src="img/designer.png">
@@ -43,9 +44,14 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <h3>Exporting</h3>
 <p>EXPORT STL writes a binary STL in millimetres. The mesh is checked to be watertight before export is allowed; if a setting is invalid the status badge turns red and tells you why.</p>
 
+<h2 class="pb">Markers</h2>
+<p>Choose <b>Dots</b>, <b>Dots + 12th inlay</b> or <b>12th inlay only</b>. Dots are 6 mm × 3 mm in the middle of the selected fret spaces; the 12th and 24th are double dots under the B and A strings, using compensated string spacing from the nut (E strings 3 mm in from the edges) to a 52.4 mm tune-o-matic. For the inlay, <b>IMPORT</b> an image, <b>PASTE</b> one, drop one on the preview, or <b>CAPTURE</b> an area of the screen (allow Screen Recording if asked). Black becomes the pocket. Adjust the trace, then size (aspect locked or free), move, rotate or mirror it. The pockets appear in the Designer model and STL.</p>
+<p>Press <b>GENERATE</b> and export the two G-code files. The <i>dots</i> file uses the board job's origin and the 6 mm cutter. The <i>inlay</i> file is for the fine cutter and can use the board origin or the centre of the inlay (Z0 on the board surface there). It ramps into every loop, slows down in full-width slots, and finishes the walls lightly on each layer. Red areas in the preview are narrower than the cutter and will be left.</p>
+<div class="note">Run marker jobs after surfacing and before releasing the board from its tabs, with the same work offsets. Air-cut first with Z raised.</div>
+
 <h2 class="pb">3. Toolpath (CNC)</h2>
 <img src="img/toolpath.png">
-<p>Press <b>TOOLPATH</b> to open the toolpath window. Set the blank and options on the left, press <b>GENERATE</b>, review the run in the viewer, then <b>EXPORT</b> to save the G-code. The status badge shows <i>OUT OF DATE</i> if you change the board after generating – generate again before exporting.</p>
+<p>Open the <b>TOOLPATH</b> tab. Set the blank and options on the left, press <b>GENERATE</b>, review the run in the viewer, then <b>EXPORT</b> to save the G-code. The status badge shows <i>OUT OF DATE</i> if you change the board after generating – generate again before exporting.</p>
 <h3>Coordinate system</h3>
 <p>X0 = heel edge of the board, Y0 = board centre line, <b>Z0 = top of the blank</b>. The bottom of the board is the bottom of the blank. Cutter: 6 mm flat end mill. Set these work offsets on the machine before running.</p>
 <h3>Blank</h3>

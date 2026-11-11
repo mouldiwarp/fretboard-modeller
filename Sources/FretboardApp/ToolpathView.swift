@@ -2,7 +2,8 @@ import SwiftUI
 import simd
 import FretboardKit
 
-struct ToolpathWindow: View {
+/// The Toolpath tab: WorkBee G-code generation with animated playback.
+struct ToolpathView: View {
     @EnvironmentObject var store: ModelStore
     @EnvironmentObject var tp: ToolpathStore
     @State private var preset: ViewPreset = .iso
@@ -12,7 +13,6 @@ struct ToolpathWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ToolpathTopBar()
             HStack(alignment: .top, spacing: 10) {
                 CNCSettingsPanel().frame(width: 600)
                 ZStack {
@@ -38,12 +38,6 @@ struct ToolpathWindow: View {
             .padding(10)
             PlaybackBar(playback: tp.playback, preset: $preset, presetToken: $presetToken, showRapids: $showRapids, showBoard: $showBoard)
         }
-        .background(Backdrop())
-        .background(WindowTint())
-        .foregroundStyle(Theme.text)
-        .tint(Theme.accent)
-        .preferredColorScheme(.dark)
-        .frame(minWidth: 1500, minHeight: 760)
         .onAppear { if tp.toolpath == nil { tp.generate(params: store.params) } }
     }
 }
@@ -127,19 +121,15 @@ struct HUD: View {
     }
 }
 
-// MARK: - Top bar
+// MARK: - Status (shown in the shell's header while this tab is selected)
 
-struct ToolpathTopBar: View {
+struct ToolpathStatus: View {
     @EnvironmentObject var store: ModelStore
     @EnvironmentObject var tp: ToolpathStore
 
     var body: some View {
         let stale = tp.isStale(for: store.params)
         HStack(spacing: 10) {
-            FretboardGlyph().frame(width: 20, height: 16)
-            Text("TOOLPATH SIMULATION").font(Theme.headingBold(15)).tracking(2.5).foregroundStyle(Theme.offwhite)
-            Text("WorkBee Z1+ · G-code").font(Theme.heading(11.5)).foregroundStyle(Theme.dim)
-            Spacer()
             LedDot(on: true, color: tp.isGenerating ? Theme.warn : (stale ? Theme.warn : (tp.toolpath == nil ? Theme.danger : Theme.ok)))
             Text(tp.isGenerating ? "GENERATING" : (stale ? "OUT OF DATE" : (tp.toolpath == nil ? "NO TOOLPATH" : "TOOLPATH READY")))
                 .font(Theme.caption(10.5)).tracking(1).foregroundStyle(Theme.text.opacity(0.85))
@@ -147,19 +137,7 @@ struct ToolpathTopBar: View {
                 LedReadout(text: GCodeWriter.formatTime(path.totalTime))
                 LedReadout(text: "\(path.moves.count) MOVES", color: Theme.haze)
             }
-            LatchButton(title: "← DESIGNER", on: false, height: 22) {
-                let toolpathWindow = NSApp.keyWindow
-                toolpathWindow?.close()
-                NSApp.windows.first { $0 !== toolpathWindow && $0.canBecomeMain && $0.isVisible }?.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
-            }
-            .frame(width: 110)
-            .help("Close the toolpath window and return to the designer")
         }
-        .padding(.horizontal, 14)
-        .frame(height: 38)
-        .background(Theme.obsidian.opacity(0.88))
-        .overlay(alignment: .bottom) { Rectangle().fill(Theme.gold.opacity(0.4)).frame(height: 1) }
     }
 }
 

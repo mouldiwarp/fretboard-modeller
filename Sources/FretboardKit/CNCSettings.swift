@@ -122,6 +122,7 @@ extension CNCSettings {
 
 public enum CutOperation: Int, CaseIterable, Sendable, Identifiable {
     case roughSurface, roughOutline, finishSurface, finishOutline
+    case dotPocket, inlayClear, inlayFinish
     public var id: Int { rawValue }
     public var title: String {
         switch self {
@@ -129,6 +130,9 @@ public enum CutOperation: Int, CaseIterable, Sendable, Identifiable {
         case .roughOutline: return "Rough outline"
         case .finishSurface: return "Finish surface"
         case .finishOutline: return "Finish outline"
+        case .dotPocket: return "Dot pockets"
+        case .inlayClear: return "Clear inlay pocket"
+        case .inlayFinish: return "Finish inlay walls"
         }
     }
 }

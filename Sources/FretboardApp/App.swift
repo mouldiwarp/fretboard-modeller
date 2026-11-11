@@ -16,27 +16,25 @@ struct FretboardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var store = ModelStore()
     @StateObject private var toolpath = ToolpathStore()
+    @StateObject private var markers = MarkerStore()
 
     var body: some Scene {
-        WindowGroup("Fretboard Modeller") {
-            ContentView()
+        // A single window: the tools are tabs inside it (see AppShell.swift).
+        Window("Fretboard Modeller", id: "main") {
+            AppShell()
                 .environmentObject(store)
                 .environmentObject(toolpath)
+                .environmentObject(markers)
         }
-        .defaultSize(width: 1380, height: 880)
-
-        Window("Toolpath Simulation", id: "toolpath") {
-            ToolpathWindow()
-                .environmentObject(store)
-                .environmentObject(toolpath)
+        .defaultSize(width: 1560, height: 880)
+        .commands {
+            CommandGroup(after: .sidebar) {
+                ForEach(AppTab.allCases) { tab in
+                    Button(tab.title) { NotificationCenter.default.post(name: .selectTab, object: tab) }
+                        .keyboardShortcut(tab.shortcut, modifiers: .command)
+                }
+            }
         }
-        .defaultSize(width: 1560, height: 860)
-
-        Window("Fret Template", id: "template") {
-            FretTemplateWindow()
-                .environmentObject(store)
-        }
-        .defaultSize(width: 1180, height: 700)
     }
 }
 
@@ -48,6 +46,12 @@ final class ModelStore: ObservableObject {
     @Published private(set) var mesh: IndexedMesh
     @Published private(set) var measurements: Measurements
     @Published private(set) var errors: [String] = []
+    /// Fret markers. Valid markers are cut into the model and its STL.
+    @Published var markers = MarkerSettings() { didSet { if markers != oldValue { scheduleRebuild() } } }
+    @Published private(set) var markerErrors: [String] = []
+    @Published private(set) var markerWarnings: [String] = []
+    /// Number of pockets in the current mesh.
+    @Published private(set) var pocketCount = 0
     /// Increments each time a new mesh is applied, so the viewer knows to rebuild.
     @Published private(set) var meshVersion = 0
 
@@ -68,18 +72,24 @@ final class ModelStore: ObservableObject {
         let errs = p.validate()
         errors = errs
         guard errs.isEmpty else { return }
+        let mk = markers
+        let probe = FretboardLayout(p)
+        markerErrors = mk.validate(probe)
+        markerWarnings = mk.warnings(probe)
+        let pockets = markerErrors.isEmpty ? mk.pockets(probe) : []
         task = Task {
             try? await Task.sleep(nanoseconds: 120_000_000)
             if Task.isCancelled { return }
             let result = await Task.detached(priority: .userInitiated) { () -> (FretboardLayout, IndexedMesh, Measurements) in
                 let l = FretboardLayout(p)
-                let m = MeshBuilder.build(l)
+                let m = MeshBuilder.build(l, pockets: pockets)
                 return (l, m, Measurements(layout: l, mesh: m))
             }.value
             if Task.isCancelled { return }
             layout = result.0
             mesh = result.1
             measurements = result.2
+            pocketCount = pockets.count
             meshVersion += 1
         }
     }

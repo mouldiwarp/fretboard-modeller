@@ -1,10 +1,11 @@
 # Fretboard Modeller
 
-A native macOS app (SwiftUI + SceneKit) for making guitar fretboards. It has three tools:
+A native macOS app (SwiftUI + SceneKit) for making guitar fretboards. It has four tools, each a tab in one window (⌘1 to ⌘4):
 
 1. **Designer** – builds a dimensionally accurate fretboard solid, lets you inspect and measure it, and exports a binary STL (millimetres).
-2. **Toolpath** – generates WorkBee Z1+ (Duet / RepRapFirmware) G-code to machine the board from a blank, with an animated playback window.
-3. **Fret Template** – generates marker-hole G-code for the jig used to cut fret slots on a chop saw.
+2. **Markers** – plans fret dots and a custom 12th-fret inlay traced from an image, cuts them into the model and STL, and writes their own G-code files.
+3. **Toolpath** – generates WorkBee Z1+ (Duet / RepRapFirmware) G-code to machine the board from a blank, with animated playback.
+4. **Fret Template** – generates marker-hole G-code for the jig used to cut fret slots on a chop saw.
 
 A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`](docs/Fretboard-Modeller-User-Guide.pdf).
 
@@ -19,8 +20,18 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
 - Viewer: orbit, ⌘ + scroll or pinch to zoom, preset views, fret lines, dimension lines, click two points to measure.
 - Export: binary STL; the mesh is checked to be watertight.
 
+## Markers
+- **Modes:** none, dots, dots + 12th-fret inlay (the inlay replaces the 12th double dot), or the inlay only.
+- **Dots:** 6 mm × 3 mm by default, in the middle of the chosen fret spaces (3, 5, 7, 9, 12, 15, 17, 19, 21, 24), with a flat floor 3 mm below the surface at the dot centre. The 12th (and 24th) are double dots under the **B and A strings**. String positions run straight from the nut (outer E strings 3 mm in from the edges) to a Les Paul tune-o-matic (52.4 mm E to E) with **compensated spacing** (equal gaps between the strings' edges, from the gauges). Because the bass strings are heavier, the pair sits slightly toward the treble side (0.75 mm with .010–.046).
+- **Inlay:** import a black-and-white image (PNG, JPEG, PDF, …), paste one, drag one in, or **Capture** an area of the screen from a design app. Black becomes the pocket; holes and islands are kept. Threshold, invert and smoothing adjust the trace. Size it freely or with the aspect ratio locked, move it, rotate it or mirror it. It is centred on the 12th fret space and may span the 11th to 13th; the app warns which fret slots will cross it. The pocket floor follows the board radius, 3 mm deep everywhere.
+- The pockets are cut into the Designer model and the STL (the mesh stays watertight).
+- **G-code** (two separate files):
+  - *Dots* – the 6 mm cutter, peck-drilled (or spiralled out if a dot is wider than the cutter), using the board job's origin (X0 heel edge, Y0 centre line, Z0 top of the blank, blank thickness from the Toolpath tab). Run it after surfacing, while the board is still held by its tabs.
+  - *Inlay* – a separate fine cutter (default 0.9 mm, 9 mm flutes). Zero on the board origin or on the **centre of the inlay** (Z0 = board surface there). Offset loops cut inside out on 0.3 mm layers; every entry ramps in along the path at 2°, the first loop after each entry runs at a reduced slot feed, and each layer ends with a light 0.05 mm finishing pass on the walls. Parts of the design narrower than the cutter are reported and shown in red.
+- Air-cut first with Z raised, then try scrap hardwood.
+
 ## Toolpath (CNC)
-The **TOOLPATH** button opens a second window that generates G-code and plays the run back at 1× to 1000× with a moving cutter and live X/Y/Z/feed readout.
+The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 1000× with a moving cutter and live X/Y/Z/feed readout.
 
 - **Machine:** Ooznest WorkBee Z1+, Duet / RepRapFirmware dialect. Work origin: X0 = heel edge of the board, Y0 = board centre line, Z0 = top of the blank. Cutter: 6 mm flat end mill.
 - **Feeds:** X/Y cutting 1000 mm/min, Z cutting 800 mm/min, fast travel configurable (default 2500 mm/min is a placeholder – set it to your machine's maximum).
@@ -61,7 +72,7 @@ DYLD_LIBRARY_PATH=$U swift test -Xswiftc -F$F -Xlinker -F$F -Xlinker -rpath -Xli
 
 ## Layout
 - `Sources/FretboardKit` – geometry, mesh, STL, measurements, toolpath and G-code generation, fret template (no UI)
-- `Sources/FretboardApp` – SwiftUI app, SceneKit viewers, the three tool windows
+- `Sources/FretboardApp` – SwiftUI app, SceneKit viewers, the four tools, each a tab in the single window (`AppShell.swift` lists them)
 - `Tests/FretboardKitTests` – geometry, mesh, toolpath and template tests
 - `docs/` – user guide (PDF + HTML source) and screenshots
 - `tools/make_icon.swift` – renders the app icon (`Resources/AppIcon.icns`)

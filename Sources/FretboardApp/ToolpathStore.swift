@@ -79,7 +79,7 @@ final class ToolpathStore: ObservableObject {
                         }
                         prevPos = m.to; prevT = times[i]
                     }
-                    sums.append(OperationSummary(op: op, moves: n, seconds: secs, cutLength: len))
+                    if n > 0 { sums.append(OperationSummary(op: op, moves: n, seconds: secs, cutLength: len)) }
                 }
                 return (tp, times, text, sums)
             }.value

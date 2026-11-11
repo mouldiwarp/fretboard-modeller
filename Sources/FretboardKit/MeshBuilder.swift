@@ -75,7 +75,7 @@ public struct IndexedMesh: Sendable {
     }
 }
 
-private struct Welder {
+struct Welder {
     struct Key: Hashable { var x, y, z: Int64 }
     var map: [Key: Int32] = [:]
     var vertices: [SIMD3<Double>] = []
@@ -122,7 +122,7 @@ public enum MeshBuilder {
     /// the cutout, and the centre strip that only exists beyond the cutout depth). Walls
     /// are generated from the boundary edges of the top surface, which guarantees a
     /// watertight result.
-    public static func build(_ L: FretboardLayout, resolution res: MeshResolution = MeshResolution()) -> IndexedMesh {
+    public static func build(_ L: FretboardLayout, pockets: [Pocket] = [], resolution res: MeshResolution = MeshResolution()) -> IndexedMesh {
         let xs = sliceXs(L, res)
         let cm = L.notchBackHalfWidth   // seam half-width beyond the cutout / flat back wall
         let hwMax = xs.map { L.outlineHalfWidth(at: $0) }.max() ?? cm + 1
@@ -203,6 +203,12 @@ public enum MeshBuilder {
             let a0 = bottom(a), b0 = bottom(b)
             tris.append(SIMD3(a, b0, b))
             tris.append(SIMD3(a, a0, b0))
+        }
+
+        if !pockets.isEmpty {
+            // Bottom and walls came from the full top above; only the top surface changes.
+            let newTop = cutPockets(L, pockets: pockets, top: top, w: &w)
+            tris = newTop + tris[top.count...]
         }
 
         var mesh = IndexedMesh()
