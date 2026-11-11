@@ -343,3 +343,23 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
                                               SIMD2(-2, t), SIMD2(-2, 5), SIMD2(-5, 5)]], aspect: 1))
     #expect(!lobe.validate(L, inlayCutter: 0.9).isEmpty)
 }
+
+/// With the inlay cutter given, the model's inlay pocket is what that cutter removes: a needle too thin for it
+/// is left standing, the mesh stays watertight and loses correspondingly less material.
+@Test func modelPocketMatchesTheRealCut() {
+    let art = InlayArtwork(rings: [[SIMD2(-5, -5), SIMD2(5, -5), SIMD2(5, 5), SIMD2(0.2, 5), SIMD2(0, 15),
+                                     SIMD2(-0.2, 5), SIMD2(-5, 5)]], aspect: 1)
+    let (L, m) = markers(.inlayOnly) { $0.inlay.artwork = art; $0.inlay.width = 1; $0.inlay.height = 1 }
+    let drawn = m.pockets(L), cut = m.pockets(L, inlayCutter: 0.9)
+    #expect(cut.count == 1)
+    let yMax = Geometry2D.bounds(cut[0].rings).max.y, yDrawn = Geometry2D.bounds(drawn[0].rings).max.y
+    #expect(abs(yDrawn - 15) < 1e-9)
+    #expect(yMax < 5.5)                          // the needle (0.4 mm wide) isn't cut
+    let plain = MeshBuilder.build(L, pockets: []).volume
+    let meshCut = MeshBuilder.build(L, pockets: cut), meshDrawn = MeshBuilder.build(L, pockets: drawn)
+    #expect(meshCut.isWatertight)
+    let lostCut = plain - meshCut.volume, lostDrawn = plain - meshDrawn.volume
+    #expect(lostCut < lostDrawn)
+    // Roughly the 10 x 10 square less the corners, 3 mm deep.
+    #expect(abs(lostCut - 300) < 6, "\(lostCut)")
+}

@@ -93,24 +93,27 @@ final class ModelStore: ObservableObject {
         let errs = p.validate()
         errors = errs
         guard errs.isEmpty else { return }
-        let mk = markers
-        let probe = FretboardLayout(p)
-        markerErrors = mk.validate(probe, inlayCutter: inlayCutter)
-        markerWarnings = mk.warnings(probe)
-        let pockets = markerErrors.isEmpty ? mk.pockets(probe) : []
+        let mk = markers, cutter = inlayCutter
+        markerWarnings = mk.warnings(FretboardLayout(p))
         task = Task {
             try? await Task.sleep(nanoseconds: 120_000_000)
             if Task.isCancelled { return }
-            let result = await Task.detached(priority: .userInitiated) { () -> (FretboardLayout, IndexedMesh, Measurements) in
+            // The inlay pocket is what the inlay cutter actually removes (tracing it takes a moment), so the
+            // checks and the mesh are both worked out off the main thread.
+            let result = await Task.detached(priority: .userInitiated) { () -> (FretboardLayout, IndexedMesh, Measurements, [String], Int) in
                 let l = FretboardLayout(p)
+                let all = mk.mode == .none ? [] : mk.pockets(l, inlayCutter: cutter)
+                let errs = mk.validate(l, inlayCutter: cutter, pockets: all)
+                let pockets = errs.isEmpty ? all : []
                 let m = MeshBuilder.build(l, pockets: pockets)
-                return (l, m, Measurements(layout: l, mesh: m))
+                return (l, m, Measurements(layout: l, mesh: m), errs, pockets.count)
             }.value
             if Task.isCancelled { return }
             layout = result.0
             mesh = result.1
             measurements = result.2
-            pocketCount = pockets.count
+            markerErrors = result.3
+            pocketCount = result.4
             meshVersion += 1
         }
     }

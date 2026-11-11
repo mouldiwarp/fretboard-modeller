@@ -127,17 +127,17 @@ public enum Raster {
     /// The boundary lies half a cell beyond the last inside cell, so half a cell is taken off (conservative).
     /// Outline of what a cutter of radius `r` actually removes from the even-odd region `rings`: every point
     /// within r of a place where the whole cutter fits. Narrow parts (sharp tips, thin strokes) drop out.
+    /// Traced on the smooth "distance to the nearest cutter centre" field, so the outline is smooth too.
     public static func cutRegion(_ rings: [[SIMD2<Double>]], radius r: Double, cell h: Double) -> [[SIMD2<Double>]] {
         guard r > 0, !rings.isEmpty else { return rings }
         let mask = rasterize(rings, cell: h, pad: Int(ceil(r / h)) + 4)
         let dist = distanceInside(mask)
-        let reach = edt(dist) { Double($0) >= r - 1e-9 }
-        var cut = Grid2D(w: mask.w, h: mask.h, origin: mask.origin, cell: h)
-        var any = false
-        for k in 0..<mask.values.count where mask.values[k] > 0.5 && Double(reach.values[k]) <= r + h {
-            cut.values[k] = 1; any = true
-        }
-        return any ? contours(cut, level: 0.5) : []
+        guard dist.values.contains(where: { Double($0) >= r - 1e-9 }) else { return [] }
+        var reach = edt(dist) { Double($0) >= r - 1e-9 }
+        for k in 0..<reach.values.count { reach.values[k] = Float(r) - reach.values[k] }   // inside = above 0
+        return contours(reach, level: 0)
+            .map { Geometry2D.simplify(ring: $0, tol: max(0.004, h / 4)) }
+            .filter { $0.count >= 3 && abs(Geometry2D.signedArea($0)) > h * h }
     }
 
     public static func distanceInside(_ mask: Grid2D) -> Grid2D {

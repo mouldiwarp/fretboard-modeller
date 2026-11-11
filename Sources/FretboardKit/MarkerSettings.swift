@@ -175,13 +175,20 @@ public struct MarkerSettings: Sendable, Equatable, Codable {
         Geometry2D.circle(center: c, radius: dotDiameter / 2, segments: 72)
     }
 
-    /// All pockets for the model.
-    public func pockets(_ L: FretboardLayout) -> [Pocket] {
+    /// Raster cell used to trace what the inlay cutter removes for the model and the checks.
+    public static let modelCutCell = 0.05
+
+    /// All pockets for the model. With `inlayCutter` (its diameter), the inlay pocket is what that cutter
+    /// actually removes: tips and strokes narrower than the cutter are left, as on the machine.
+    public func pockets(_ L: FretboardLayout, inlayCutter: Double? = nil) -> [Pocket] {
         var out: [Pocket] = []
         for c in dotCentres(L) {
             out.append(Pocket(rings: [dotRing(c)], floor: .flat(z: L.topZ(x: c.x, y: c.y) - dotDepth)))
         }
-        let rings = inlayRings(L)
+        var rings = inlayRings(L)
+        if let d = inlayCutter, d > 0, !rings.isEmpty {
+            rings = Raster.cutRegion(rings, radius: d / 2, cell: min(Self.modelCutCell, d / 8))
+        }
         if !rings.isEmpty { out.append(Pocket(rings: rings, floor: .contoured(depth: inlay.depth))) }
         return out
     }
@@ -190,7 +197,8 @@ public struct MarkerSettings: Sendable, Equatable, Codable {
 
     /// `inlayCutter`: diameter of the inlay cutter. When given, the inlay's clearances are measured on what that
     /// cutter actually removes, so sharp tips it can't reach don't count as being too close to the edge.
-    public func validate(_ L: FretboardLayout, inlayCutter: Double? = nil) -> [String] {
+    /// `pockets`: the result of `pockets(L, inlayCutter:)` if already computed.
+    public func validate(_ L: FretboardLayout, inlayCutter: Double? = nil, pockets given: [Pocket]? = nil) -> [String] {
         var e: [String] = []
         if mode == .none { return e }
         if mode.hasDots {
@@ -202,11 +210,7 @@ public struct MarkerSettings: Sendable, Equatable, Codable {
             if inlay.fret < 1 || inlay.fret > L.params.fretCount { e.append("The inlay fret is not on the board.") }
         }
         guard e.isEmpty else { return e }
-        var ps = pockets(L)
-        if let d = inlayCutter, d > 0, mode.hasInlay, let i = ps.lastIndex(where: { if case .contoured = $0.floor { return true }; return false }) {
-            let cut = Raster.cutRegion(ps[i].rings, radius: d / 2, cell: min(0.05, d / 8))
-            if cut.isEmpty { ps.remove(at: i) } else { ps[i].rings = cut }
-        }
+        let ps = given ?? pockets(L, inlayCutter: inlayCutter)
         let minX = L.notchDepth + edgeMargin, maxX = L.xNut - edgeMargin
         var outside = false, tooDeep = false
         for p in ps {
