@@ -137,7 +137,8 @@ public enum MarkerToolpath {
             let floor = surf - m.dotDepth
             mv.rapid(SIMD3(mv.pos.x, mv.pos.y, s.safeZ), op)
             mv.rapid(SIMD3(c.x, c.y, s.safeZ), op)
-            mv.rapid(SIMD3(c.x, c.y, surf + 1), op)
+            // Never rapid below the safe height: the work Z may not match the model, so go down at plunge feed.
+            mv.cut(SIMD3(c.x, c.y, surf), op, feed: s.xyFeed)
             var z = surf
             while z > floor + 1e-9 {
                 let prev = z
@@ -212,9 +213,7 @@ public enum MarkerToolpath {
         let z0 = s.origin == .board ? T : L.topZ(x: centre.x, y: centre.y)
         func surf(_ p: SIMD2<Double>) -> Double { L.topZ(x: p.x, y: p.y) - z0 }
         func out(_ p: SIMD2<Double>, _ depth: Double) -> SIMD3<Double> { SIMD3(p.x - off.x, p.y - off.y, surf(p) - depth) }
-        var clear = -Double.infinity
-        for ring in rings { for p in ring { clear = max(clear, surf(p)) } }
-        clear += 1.0
+        let clear = s.safeZ   // all travel moves stay at the safe height
 
         // What the cutter cannot reach: farther than r from every point where its centre fits.
         let reach = Raster.edt(dist) { Double($0) >= r - 1e-9 }
@@ -307,9 +306,14 @@ public enum MarkerToolpath {
                         // Enter: lift, move over, drop to just above the last floor, ramp down along the loop.
                         mv.retract(clear, op)
                         mv.rapid(SIMD3(pts[0].x - off.x, pts[0].y - off.y, clear), op)
-                        let above = out(pts[0], prevDepth - 0.2)
-                        mv.rapid(above, op)
-                        mv.cut(out(pts[0], prevDepth), op, feed: slotFeed)
+                        if li == 0 {
+                            // First layer: the work Z may not match the model, so descend at plunge feed from the safe height.
+                            mv.cut(out(pts[0], prevDepth), op, feed: s.plungeFeed)
+                        } else {
+                            // Deeper layers re-enter the already-cleared pocket.
+                            mv.rapid(out(pts[0], prevDepth - 0.2), op)
+                            mv.cut(out(pts[0], prevDepth), op, feed: slotFeed)
+                        }
                         let rampLen = (depth - prevDepth) / tanA
                         var travelled = 0.0
                         var k = 0

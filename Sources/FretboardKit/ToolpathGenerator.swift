@@ -9,6 +9,9 @@ public enum ToolpathGenerator {
         return Toolpath(start: SIMD3(0, 0, s.safeZ), moves: g.moves, settings: s)
     }
 
+    /// How far outside the final edge the finish outline plunges (mm).
+    public static let finishLeadIn = 1.0
+
     // MARK: Outline offset
 
     /// Tool-centre path around the board outline, offset outward by `d`, counter-clockwise seen from above
@@ -304,15 +307,25 @@ public enum ToolpathGenerator {
             retract(op)
         }
 
-        /// Full-depth cut round the board, leaving tabs.
+        /// Full-depth cut round the board, leaving tabs. The cutter plunges 1 mm clear of the board and eases in to
+        /// the final offset along the straight nut end, so the plunge never marks the finished edge.
         mutating func outlineFinish() {
             let path = loop(offset: r)
-            guard let p0 = path.first else { return }
+            guard path.count > 1 else { return }
+            let p0 = path[0]
             let op = CutOperation.finishOutline
             let level = -T - s.throughCutExtra
             let tabZ = -T + s.tabHeight
             let zones = ToolpathGenerator.tabZones(layout: L, path: path, settings: s)
-            enter(SIMD3(p0.x, p0.y, level), approachZ: machineZ(p0.x, p0.y, allowance: 0) + 1.0, op)
+
+            // Lead-in along the first (straight) segment, from 1 mm out to the final offset.
+            let seg = simd_distance(p0, path[1])
+            let straight = abs(path[1].x - p0.x) < 1e-6 && seg > 2
+            let leadLen = straight ? min(8.0, seg * 0.8) : 0
+            let q = straight ? p0 + simd_normalize(path[1] - p0) * leadLen : p0
+            let start = straight ? SIMD2(p0.x + ToolpathGenerator.finishLeadIn, p0.y) : p0
+            enter(SIMD3(start.x, start.y, level), approachZ: machineZ(start.x, start.y, allowance: 0) + 1.0, op)
+            if straight { cut(SIMD3(q.x, q.y, level), op) }
 
             var cum = [0.0]
             for i in 1..<path.count { cum.append(cum[i - 1] + simd_distance(path[i], path[i - 1])) }
@@ -320,8 +333,8 @@ public enum ToolpathGenerator {
             var ei = 0
             var z = level
             for i in 1..<path.count {
-                let a = path[i - 1], b = path[i]
-                let sa = cum[i - 1], sb = cum[i]
+                let a = (i == 1 && straight) ? q : path[i - 1], b = path[i]
+                let sa = (i == 1 && straight) ? leadLen : cum[i - 1], sb = cum[i]
                 while ei < events.count, events[ei] <= sb + 1e-9 {
                     let e = max(events[ei], sa)
                     let t = sb > sa ? (e - sa) / (sb - sa) : 1
@@ -333,6 +346,7 @@ public enum ToolpathGenerator {
                 }
                 if simd_distance(SIMD2(pos.x, pos.y), b) > 1e-9 || abs(pos.z - z) > 1e-9 { cut(SIMD3(b.x, b.y, z), op) }
             }
+            if straight { cut(SIMD3(q.x, q.y, z), op) }                  // run past the start to clean the lead-in wedge
             retract(op)
         }
     }

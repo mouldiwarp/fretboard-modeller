@@ -300,3 +300,16 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     #expect(!g.contains("M3 ") && !g.contains("M5"))
     #expect(g.contains("(Fret 1)\nG0 Z5.000\nG0 X36.353 Y0.000\nG1 Z-6.000 F200.000"))
 }
+
+@Test func finishOutlinePlungesOneMillimetreClearAndClosesIn() {
+    let (_, tp) = job()
+    let fin = tp.moves.filter { $0.op == .finishOutline }
+    guard let plunge = fin.first(where: { $0.kind == .cut }) else { Issue.record("no finish cut"); return }
+    let L = FretboardLayout(FretboardParameters())
+    let finalStart = ToolpathGenerator.offsetOutline(L, offset: tp.settings.cutterRadius)[0]
+    #expect(abs(plunge.to.x - (finalStart.x + ToolpathGenerator.finishLeadIn)) < 1e-6)
+    // The next move eases in to the final offset.
+    let i = fin.firstIndex(where: { $0.kind == .cut })!
+    let next = fin[i + 1]
+    #expect(abs(next.to.x - finalStart.x) < 1e-6 && abs(next.to.y) > 1)
+}

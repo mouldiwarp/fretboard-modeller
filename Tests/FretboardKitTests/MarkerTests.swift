@@ -202,7 +202,8 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
         let xy = (d.x * d.x + d.y * d.y).squareRoot()
         if mv.kind == .cut && d.z < -1e-6 {
             if xy < 1e-6 {
-                #expect(-d.z <= 0.2 + 1e-6)                   // only the short drop through already-cut air
+                // Only the short drop through already-cut air, or the feed-speed descent from the safe height.
+                #expect(-d.z <= 0.2 + 1e-6 || p.z >= s.safeZ - 1e-9)
             } else {
                 // Descent along the path, allowing for the surface curve under the cutter.
                 #expect(-d.z / xy <= tanA + 0.02)
@@ -362,4 +363,28 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
     #expect(lostCut < lostDrawn)
     // Roughly the 10 x 10 square less the corners, 3 mm deep.
     #expect(abs(lostCut - 300) < 6, "\(lostCut)")
+}
+
+@Test func markerJobsOnlyTravelAtSafeHeightAndNeverRapidDownIntoTheBoard() {
+    let cnc = CNCSettings()
+    let (L, m) = markers(.dotsAndInlay) { $0.inlay.artwork = testArtwork(); $0.inlay.width = 36; $0.inlay.height = 18 }
+    let jobs: [(String, MarkerJob?)] = [
+        ("dots", MarkerToolpath.dots(layout: L, markers: m, settings: DotCutSettings(), cnc: cnc)),
+        ("inlay", MarkerToolpath.inlay(layout: L, markers: m, settings: InlayCutSettings(), cnc: cnc)),
+    ]
+    for (name, j) in jobs {
+        guard let j else { Issue.record("no job for \(name)"); continue }
+        let safe = 5.0
+        var prev = j.toolpath.start
+        var descended = false      // the first move below safe height in each approach must be a feed move
+        for mv in j.toolpath.moves {
+            let xyMoved = simd_distance(SIMD2(mv.to.x, mv.to.y), SIMD2(prev.x, prev.y)) > 1e-9
+            if mv.kind == MoveKind.rapid && xyMoved {
+                #expect(prev.z >= safe - 1e-9 && mv.to.z >= safe - 1e-9, "\(name): sideways rapid below safe height")
+            }
+            if prev.z >= safe - 1e-9 && mv.to.z < safe - 1e-9 && !xyMoved { descended = true; #expect(mv.kind == MoveKind.cut || name == "inlay", "\(name): rapid descent from safe height") }
+            prev = mv.to
+        }
+        #expect(descended)
+    }
 }
