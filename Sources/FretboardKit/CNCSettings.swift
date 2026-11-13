@@ -43,6 +43,12 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     public var tabHeight = 1.5
     /// Climb milling (counter-clockwise around the board, clockwise spindle) or conventional (clockwise).
     public var climbOutline = true
+    /// Moves the finishing outline cut this far into the board on every side (mm). Use it to correct a part that
+    /// comes out slightly oversize from tool deflection or a cutter that measures under its nominal size.
+    /// Positive cuts closer to the board (smaller part); negative leaves more.
+    public var outlineTrim = 0.0
+    /// Runs the finishing outline cut twice. The second lap removes what the tool pushed away on the first.
+    public var outlineSpringPass = false
     /// Spindle speed for M3 (0 = no spindle commands, e.g. a manually controlled router).
     public var spindleRPM = 0
 
@@ -83,6 +89,7 @@ public struct CNCSettings: Equatable, Sendable, Codable {
             e.append("Blank must be at least \(String(format: "%.1f", minimumStockThickness(for: params))) mm thick so there is a roughing pass to cut.")
         }
         if safeZ <= 0 { e.append("Safe Z must be above the stock top.") }
+        if abs(outlineTrim) > 1 || cutterRadius - outlineTrim <= 0 { e.append("Outline trim must be within ±1 mm.") }
         if trenchWidthFactor < 1 { e.append("Trench width must be at least one cutter diameter.") }
         if tabCount < 0 || tabWidth <= 0 || tabHeight <= 0 || tabHeight >= stockThickness - 1 {
             e.append("Tab settings are not valid.")

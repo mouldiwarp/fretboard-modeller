@@ -6,9 +6,9 @@ import FretboardKit
 /// The fret-slot jig template tool: marker-hole G-code for locating fret slots on a chop saw jig.
 struct FretTemplateView: View {
     @EnvironmentObject var store: ModelStore
-    @State private var scaleLength = FretboardParameters().scaleLength
-    @State private var fretCount = FretboardParameters().fretCount
-    @State private var settings = FretTemplate.Settings()
+    @State private var scaleLength = AppDefaults.shared.template.params.scaleLength
+    @State private var fretCount = AppDefaults.shared.template.params.fretCount
+    @State private var settings = AppDefaults.shared.file.fretTemplate
     @State private var synced = false
 
     private var marks: [FretMark] { FretTemplate.positions(scaleLength: scaleLength, fretCount: fretCount) }

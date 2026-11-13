@@ -8,7 +8,7 @@ extension Notification.Name {
 /// The app's tools. To add a tool, add a case here and fill in its title, icon, shortcut,
 /// content and (optionally) status; the shell, tab bar and View menu pick it up automatically.
 enum AppTab: String, CaseIterable, Identifiable {
-    case designer, markers, toolpath, template
+    case designer, markers, toolpath, template, settings
 
     var id: String { rawValue }
 
@@ -18,6 +18,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .markers: "Markers"
         case .toolpath: "Toolpath"
         case .template: "Fret Template"
+        case .settings: "Defaults"
         }
     }
 
@@ -27,6 +28,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .markers: "Fret dots & 12th fret inlay"
         case .toolpath: "WorkBee Z1+ · G-code"
         case .template: "Chop-saw jig · marker-hole G-code"
+        case .settings: "Starting values for every setting"
         }
     }
 
@@ -36,6 +38,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .markers: "circle.grid.2x1"
         case .toolpath: "scope"
         case .template: "ruler"
+        case .settings: "slider.horizontal.3"
         }
     }
 
@@ -45,6 +48,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .markers: "2"
         case .toolpath: "3"
         case .template: "4"
+        case .settings: "5"
         }
     }
 
@@ -62,6 +66,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .markers: MarkersView()
         case .toolpath: ToolpathView()
         case .template: FretTemplateView()
+        case .settings: SettingsView()
         }
     }
 
@@ -71,7 +76,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .designer: DesignerStatus()
         case .markers: MarkersStatus()
         case .toolpath: ToolpathStatus()
-        case .template: EmptyView()
+        case .template, .settings: EmptyView()
         }
     }
 }
@@ -91,7 +96,7 @@ struct AppShell: View {
     /// `--toolpath` or `--inlay-image <file>` start on that tab (development aids).
     static var launchTab: AppTab {
         let a = CommandLine.arguments
-        return a.contains("--toolpath") ? .toolpath : (a.contains("--inlay-image") ? .markers : .designer)
+        return a.contains("--settings") ? .settings : a.contains("--toolpath") ? .toolpath : (a.contains("--inlay-image") ? .markers : .designer)
     }
 
     var body: some View {

@@ -9,9 +9,9 @@ public struct FretMark: Identifiable, Equatable {
 }
 
 public enum FretTemplate {
-    public enum CommentStyle: String, CaseIterable { case parentheses, semicolon }
+    public enum CommentStyle: String, CaseIterable, Codable, Sendable { case parentheses, semicolon }
 
-    public struct Settings: Equatable {
+    public struct Settings: Equatable, Codable, Sendable {
         public var holeDiameter = 4.0       // documentation only
         public var plungeDepth = 6.0
         public var safeZ = 5.0

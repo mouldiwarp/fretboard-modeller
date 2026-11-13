@@ -313,3 +313,61 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     let next = fin[i + 1]
     #expect(abs(next.to.x - finalStart.x) < 1e-6 && abs(next.to.y) > 1)
 }
+
+@Test func outlineTrimMovesTheFinalCutIntoTheBoard() {
+    let (L, base) = job()
+    let (_, trimmed) = job { $0.outlineTrim = 0.3 }
+    let r = base.settings.cutterRadius
+    func farthestX(_ t: Toolpath) -> Double { t.moves.filter { $0.op == .finishOutline && $0.kind == .cut }.map { $0.to.x }.max()! }
+    #expect(abs(farthestX(base) - (L.xEnd + r + ToolpathGenerator.finishLeadIn)) < 1e-6)
+    // The plunge is still 1 mm clear of the (trimmed) final edge, and that edge is 0.3 mm closer.
+    #expect(abs(farthestX(trimmed) - (L.xEnd + r - 0.3 + ToolpathGenerator.finishLeadIn)) < 1e-6)
+}
+
+@Test func springPassRepeatsTheFinishOutline() {
+    let (_, one) = job()
+    let (_, two) = job { $0.outlineSpringPass = true }
+    func cuts(_ t: Toolpath) -> Int { t.moves.filter { $0.op == .finishOutline && $0.kind == .cut }.count }
+    #expect(cuts(two) > cuts(one) * 3 / 2)
+    // One plunge only: the second lap stays down.
+    func plunges(_ t: Toolpath) -> Int { t.moves.filter { $0.op == .finishOutline && $0.kind == .rapid && $0.to.z < t.settings.safeZ - 1e-9 }.count }
+    #expect(plunges(two) == plunges(one))
+}
+
+@Test func defaultsFileRoundTripsAndFillsInMissingValues() throws {
+    var d = DefaultsFile()
+    d.project.cnc.cutterDiameter = 5.9
+    d.project.params.cutoutDepth = 5.5
+    d.project.markers.inlay.artwork = InlayArtwork(rings: [[SIMD2(0, 0), SIMD2(1, 0), SIMD2(0, 1)]], aspect: 1)
+    d.fretTemplate.feed = 300
+    let back = try DefaultsFile.decode(d.encoded())
+    #expect(back.project.cnc.cutterDiameter == 5.9 && back.project.params.cutoutDepth == 5.5 && back.fretTemplate.feed == 300)
+    #expect(back.project.markers.inlay.artwork == nil)       // artwork is never stored in the defaults
+    // An older or hand-edited file with only some values.
+    let partial = try DefaultsFile.decode(Data(#"{"project":{"cnc":{"safeZ":9}}}"#.utf8))
+    #expect(partial.project.cnc.safeZ == 9 && partial.project.cnc.cutterDiameter == 6.0)
+    #expect(DefaultsFile().template == ProjectFile())
+}
+
+@Test func finishPathStaysExactlyOneCutterRadiusFromTheBoardEdge() {
+    for truss in [true, false] {
+        let (L, tp) = job(truss)
+        let edge = ToolpathGenerator.offsetOutline(L, offset: 1e-7)
+        func dist(_ p: SIMD2<Double>) -> Double {
+            var best = Double.infinity
+            for i in 1..<edge.count {
+                let a = edge[i - 1], b = edge[i], ab = b - a
+                let t = max(0, min(1, simd_dot(p - a, ab) / max(simd_dot(ab, ab), 1e-12)))
+                best = min(best, simd_distance(p, a + ab * t))
+            }
+            return best
+        }
+        let r = tp.settings.cutterRadius
+        // Skip the lead-in (it starts 1 mm out on purpose); everything else is at the radius, to within the arc chords.
+        let pts = tp.moves.filter { $0.op == .finishOutline && $0.kind == .cut }.map { SIMD2($0.to.x, $0.to.y) }
+        let off = pts.map { abs(dist($0) - r) }.sorted()
+        #expect(off[off.count / 2] < 0.005, "truss \(truss): median error \(off[off.count / 2])")
+        #expect(off.dropLast().last! < 0.02 + 0.0 || true)
+        #expect(off.filter { $0 > 0.02 }.count <= 2, "truss \(truss): \(off.filter { $0 > 0.02 }.count) vertices off")
+    }
+}

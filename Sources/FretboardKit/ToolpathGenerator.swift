@@ -310,7 +310,7 @@ public enum ToolpathGenerator {
         /// Full-depth cut round the board, leaving tabs. The cutter plunges 1 mm clear of the board and eases in to
         /// the final offset along the straight nut end, so the plunge never marks the finished edge.
         mutating func outlineFinish() {
-            let path = loop(offset: r)
+            let path = loop(offset: r - s.outlineTrim)
             guard path.count > 1 else { return }
             let p0 = path[0]
             let op = CutOperation.finishOutline
@@ -330,23 +330,25 @@ public enum ToolpathGenerator {
             var cum = [0.0]
             for i in 1..<path.count { cum.append(cum[i - 1] + simd_distance(path[i], path[i - 1])) }
             let events = zones.flatMap { [$0.0, $0.1] }.sorted()
-            var ei = 0
-            var z = level
-            for i in 1..<path.count {
-                let a = (i == 1 && straight) ? q : path[i - 1], b = path[i]
-                let sa = (i == 1 && straight) ? leadLen : cum[i - 1], sb = cum[i]
-                while ei < events.count, events[ei] <= sb + 1e-9 {
-                    let e = max(events[ei], sa)
-                    let t = sb > sa ? (e - sa) / (sb - sa) : 1
-                    let p = a + (b - a) * t
-                    cut(SIMD3(p.x, p.y, z), op)
-                    z = (z == level) ? tabZ : level                      // lift over the tab / drop after it
-                    cut(SIMD3(p.x, p.y, z), op)
-                    ei += 1
+            for _ in 0..<(s.outlineSpringPass ? 2 : 1) {
+                var ei = 0
+                var z = level
+                for i in 1..<path.count {
+                    let a = (i == 1 && straight) ? q : path[i - 1], b = path[i]
+                    let sa = (i == 1 && straight) ? leadLen : cum[i - 1], sb = cum[i]
+                    while ei < events.count, events[ei] <= sb + 1e-9 {
+                        let e = max(events[ei], sa)
+                        let t = sb > sa ? (e - sa) / (sb - sa) : 1
+                        let p = a + (b - a) * t
+                        cut(SIMD3(p.x, p.y, z), op)
+                        z = (z == level) ? tabZ : level                      // lift over the tab / drop after it
+                        cut(SIMD3(p.x, p.y, z), op)
+                        ei += 1
+                    }
+                    if simd_distance(SIMD2(pos.x, pos.y), b) > 1e-9 || abs(pos.z - z) > 1e-9 { cut(SIMD3(b.x, b.y, z), op) }
                 }
-                if simd_distance(SIMD2(pos.x, pos.y), b) > 1e-9 || abs(pos.z - z) > 1e-9 { cut(SIMD3(b.x, b.y, z), op) }
+                if straight { cut(SIMD3(q.x, q.y, z), op) }                  // run past the start to clean the lead-in wedge
             }
-            if straight { cut(SIMD3(q.x, q.y, z), op) }                  // run past the start to clean the lead-in wedge
             retract(op)
         }
     }

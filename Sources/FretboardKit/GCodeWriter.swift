@@ -17,6 +17,9 @@ public enum GCodeWriter {
         out.append(String(format: "; Blank: %.1f x %.1f mm, heel edge of board is %.1f mm in from the blank's end; blank centred on Y0",
                           s.stockLength, s.stockWidth, s.stockHeelMargin))
         out.append(String(format: "; Outline direction: %@; %d tabs", s.climbOutline ? "climb (counter-clockwise)" : "conventional (clockwise)", s.tabCount))
+        if s.outlineTrim != 0 || s.outlineSpringPass {
+            out.append(String(format: "; Finish outline: trim %.3f mm per side, %@", s.outlineTrim, s.outlineSpringPass ? "with spring pass" : "single pass"))
+        }
         out.append(String(format: "; Feeds: X/Y %.0f, Z %.0f, rapid %.0f mm/min", s.xyFeed, s.zFeed, s.rapidFeed))
         out.append(String(format: "; Estimated run time: %@", formatTime(t.totalTime)))
         return write(t, header: out)

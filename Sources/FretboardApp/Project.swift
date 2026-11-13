@@ -19,6 +19,7 @@ final class ProjectController: ObservableObject {
     init() {
         markers.model = model
         saved = ProjectFile()
+        apply(AppDefaults.shared.template)
         saved = snapshot()
     }
 
@@ -45,11 +46,19 @@ final class ProjectController: ObservableObject {
         toolpath.clear()
     }
 
+    /// Replaces every setting with the user's defaults, keeping the inlay image and artwork.
+    func applyDefaultsKeepingInlay() {
+        var p = AppDefaults.shared.template
+        p.image = snapshot().image
+        p.markers.inlay.artwork = model.markers.inlay.artwork
+        apply(p)
+    }
+
     // MARK: Commands
 
     func newProject() {
         guard confirmDiscard(action: "starting a new project") else { return }
-        apply(ProjectFile())
+        apply(AppDefaults.shared.template)
         url = nil
         saved = snapshot()
     }

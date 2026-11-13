@@ -52,3 +52,36 @@ public struct ProjectFile: Codable, Equatable, Sendable {
         return out
     }
 }
+
+/// The user's own starting values for new projects: everything in a project that has a default, plus the
+/// Fret Template tool's settings. Saved separately from projects; anything missing takes the factory default.
+public struct DefaultsFile: Codable, Equatable, Sendable {
+    public var project = ProjectFile()
+    public var fretTemplate = FretTemplate.Settings()
+    public init() {}
+
+    /// A project's starting point: the defaults, with no image or traced artwork.
+    public var template: ProjectFile {
+        var p = project
+        p.image = nil
+        p.markers.inlay.artwork = nil
+        return p
+    }
+
+    public func encoded() throws -> Data {
+        var d = self
+        d.project = template
+        let e = JSONEncoder()
+        e.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try e.encode(d)
+    }
+
+    public static func decode(_ data: Data) throws -> DefaultsFile {
+        guard let saved = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let base = try JSONSerialization.jsonObject(with: JSONEncoder().encode(DefaultsFile())) as! [String: Any]
+        let merged = ProjectFile.merge(base, saved)
+        return try JSONDecoder().decode(DefaultsFile.self, from: JSONSerialization.data(withJSONObject: merged))
+    }
+}
