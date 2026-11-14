@@ -17,7 +17,7 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <table><tr><th>Tool</th><th>Opened from</th><th>Produces</th></tr>
 <tr><td><b>Designer</b></td><td>Tab 1 (⌘1)</td><td>3D fretboard, measurements, binary <code>.stl</code> (mm)</td></tr>
 <tr><td><b>Markers</b></td><td>Tab 2 (⌘2)</td><td>Fret dots and a traced 12th-fret inlay in the model, plus their own G-code files</td></tr>
-<tr><td><b>Toolpath</b></td><td>Tab 3 (⌘3)</td><td>G-code (<code>.nc</code>) for the WorkBee Z1+ or FoxAlien XE-Pro Ultra, with animated playback</td></tr>
+<tr><td><b>Toolpath</b></td><td>Tab 3 (⌘3)</td><td>G-code (<code>.nc</code>) for GRBL or Duet machines, with animated playback</td></tr>
 <tr><td><b>Fret Template</b></td><td>Tab 4 (⌘4)</td><td>Marker-hole G-code for the chop-saw fret slot jig</td></tr></table>
 <p>Launch it from Spotlight (⌘ Space, “Fretboard Modeller”) after running <code>./make_app.sh</code>. The four tools are tabs along the top of the one window (⌘1 Designer, ⌘2 Markers, ⌘3 Toolpath, ⌘4 Fret Template). Toolpath is unavailable while the Designer inputs are invalid.</p>
 <p><b>Projects:</b> File › New Project (⌘N), Open… (⌘O), Save (⌘S) and Save As… (⇧⌘S) work with <code>.fretboard</code> files, which hold the board dimensions, CNC settings, markers, marker job settings and the inlay image itself. The project name is shown in the header; an amber dot (and “Edited” in the window title) means unsaved changes, and New, Open and Quit ask before discarding them. Generated toolpaths are not saved; press GENERATE again after opening.</p>
@@ -76,8 +76,8 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <h3>Playback</h3>
 <p>Play the run at 1×, 10×, 50×, 200× or 1000× with the slider; the cutter and live X/Y/Z/feed readout follow the path. Views: 3D / TOP / SIDE; toggle RAPIDS and BOARD. Path colours: gold = rough surface, amber = rough outline, blue = finish surface, green = finish outline. Playback shows the cutter path, not material removal.</p>
 <h3>G-code format</h3>
-<p>Pick the machine in the Toolpath tab: <b>Ooznest WorkBee Z1+</b> (Duet / RepRapFirmware) or <b>FoxAlien XE-Pro Ultra</b> (GRBL). Choosing one loads its starting feeds and spindle speed, which you can change. The FoxAlien output uses <code>G94</code> and <code>G54</code>, <code>M3 S&lt;rpm&gt;</code> followed by a 5 second <code>G4</code> spin-up for the VFD spindle, <code>(parenthesis)</code> comments on their own lines, no feed word on rapids, and ends with <code>M5</code> and <code>M2</code>. It runs from USB or the offline controller.</p>
-<p>WorkBee / Duet / RepRapFirmware: <code>G21</code>, <code>G90</code>, <code>G17</code>, explicit <code>G0</code>/<code>G1</code> with feed rates, header comments describing the job, and a section comment per operation. Check the output against your machine's configuration before the first run, and test above the stock.</p>
+<p>Pick the G-code dialect in the Toolpath tab: <b>GRBL</b> (any GRBL machine) or <b>Duet / RepRapFirmware</b>. Choosing one loads starting feeds and spindle speed, which you can change. The GRBL output uses <code>G94</code> and <code>G54</code>, <code>M3 S&lt;rpm&gt;</code> followed by a 5 second <code>G4</code> spin-up for the VFD spindle, <code>(parenthesis)</code> comments on their own lines, no feed word on rapids, and ends with <code>M5</code> and <code>M2</code>. It runs from a USB sender or an offline controller.</p>
+<p>Duet / RepRapFirmware: <code>G21</code>, <code>G90</code>, <code>G17</code>, explicit <code>G0</code>/<code>G1</code> with feed rates, header comments describing the job, and a section comment per operation. Check the output against your machine's configuration before the first run, and test above the stock.</p>
 
 <h2 class="pb">4. Fret Template</h2>
 <img src="img/template.png">
