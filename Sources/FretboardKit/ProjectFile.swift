@@ -39,7 +39,14 @@ public struct ProjectFile: Codable, Equatable, Sendable {
             throw CocoaError(.fileReadUnsupportedScheme, userInfo: [NSLocalizedDescriptionKey: "This project was saved by a newer version of Fretboard Modeller."])
         }
         let defaults = try JSONSerialization.jsonObject(with: JSONEncoder().encode(ProjectFile())) as! [String: Any]
-        let merged = merge(defaults, savedObject)
+        var merged = merge(defaults, savedObject)
+        // Projects saved before the Gibson/Fender choice had a free "nut thickness": any extension means Fender.
+        if var params = merged["params"] as? [String: Any],
+           (savedObject["params"] as? [String: Any])?["fenderNut"] == nil,
+           let t = (savedObject["params"] as? [String: Any])?["nutThickness"] as? Double, t > 0 {
+            params["fenderNut"] = true
+            merged["params"] = params
+        }
         return try JSONDecoder().decode(ProjectFile.self, from: JSONSerialization.data(withJSONObject: merged))
     }
 

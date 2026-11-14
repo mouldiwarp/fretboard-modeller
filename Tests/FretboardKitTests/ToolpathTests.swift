@@ -371,3 +371,28 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
         #expect(off.filter { $0 > 0.02 }.count <= 2, "truss \(truss): \(off.filter { $0 > 0.02 }.count) vertices off")
     }
 }
+
+@Test func fenderNutExtendsTheBoardTenMillimetresAndAddsFretMinusOne() throws {
+    var p = FretboardParameters()
+    let gibson = FretboardLayout(p)
+    #expect(gibson.xEnd == gibson.xNut)
+    p.fenderNut = true
+    let fender = FretboardLayout(p)
+    #expect(abs(fender.xEnd - (fender.xNut + 10)) < 1e-9)
+    #expect(abs(fender.fretX(0) - fender.xNut) < 1e-9)           // the zero fret has not moved
+
+    let g = FretTemplate.positions(scaleLength: 647.7, fretCount: 22)
+    #expect(g.first?.id == 0 && g.count == 23)
+    let f = FretTemplate.positions(scaleLength: 647.7, fretCount: 22, fenderNut: true)
+    #expect(f.count == 24 && f[0].id == -1 && f[0].distanceFromNut == -4 && f[1].id == 0)
+    #expect(f[1].spacingFromPrevious == 4)
+    let code = FretTemplate.gcode(scaleLength: 647.7, marks: f, settings: .init())
+    #expect(code.contains("(Fret -1)\nG0 Z5.000\nG0 X-4.000 Y0.000"))
+    #expect(code.contains("(Fret Count: 22)"))
+
+    // Projects saved with the old free "nut thickness" become Fender when it was non-zero.
+    var old = try JSONSerialization.jsonObject(with: ProjectFile().encoded()) as! [String: Any]
+    var params = old["params"] as! [String: Any]
+    params["nutThickness"] = 3.0; params.removeValue(forKey: "fenderNut"); old["params"] = params
+    #expect(try ProjectFile.decode(JSONSerialization.data(withJSONObject: old)).params.fenderNut)
+}

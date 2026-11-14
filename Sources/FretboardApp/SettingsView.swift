@@ -88,7 +88,7 @@ struct SettingsView: View {
             num("Thickness", P.appending(path: \.params.thickness))
             num("Radius at fret 1", P.appending(path: \.params.radiusFirstFretInches), "in")
             num("Radius at last fret", P.appending(path: \.params.radiusLastFretInches), "in")
-            num("Nut thickness", P.appending(path: \.params.nutThickness))
+            flag("Fender-style nut (10 mm past 0 fret)", P.appending(path: \.params.fenderNut))
             num("Wide-end corner Ø", P.appending(path: \.params.cornerDiameter))
         }
     }

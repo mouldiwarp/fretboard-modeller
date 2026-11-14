@@ -12,7 +12,7 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
 ![Designer](docs/img/designer.png)
 
 ## Designer
-- Inputs: scale length (mm, with inch presets), fret count, nut width, last-fret width, nut thickness (default 0), surface radius at the first and last fret in inches (equal = constant radius, different = compound), max thickness (7 mm), wide-end corner diameter (9.5 mm).
+- Inputs: scale length (mm, with inch presets), fret count, nut width, last-fret width, **Gibson / Fender nut** (Gibson: the board stops at the 0 fret; Fender: it runs 10 mm past it), surface radius at the first and last fret in inches (equal = constant radius, different = compound), max thickness (7 mm), wide-end corner diameter (9.5 mm).
 - The widest end is at the origin (X = 0, the heel); the narrowest end is toward +X. The wide corners are rounded; the narrow end has hard corners.
 - The board always extends at least 9 mm past the last fret (configurable, default 9 mm).
 - **Spoke-wheel truss rod** (on by default): adds a cutout centred on the heel edge, default 20 mm wide × 5 mm deep with 3 mm inside corner radius, all editable.
@@ -57,7 +57,7 @@ The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 10
 ![Toolpath](docs/img/toolpath.png)
 
 ## Fret Template
-Ported from the standalone Fret Template Builder. Computes fret positions from the nut (`d = L·(1 − 1/2^(n/12))`) and writes GRBL-style G-code that drills marker holes on the centre line (Y0) at each fret (fret 0 = X0). Defaults: 4 mm hole (documentation only), 6 mm plunge, 5 mm safe Z, 200 mm/min. No spindle commands – run the drill by hand. Scale length and fret count start from the designer's values.
+Ported from the standalone Fret Template Builder. Computes fret positions from the nut (`d = L·(1 − 1/2^(n/12))`) and writes GRBL-style G-code that drills marker holes on the centre line (Y0) at each fret (fret 0 = X0). For a **Fender-style nut** it adds fret −1, a second slot 4 mm past the nut (X−4). Defaults: 4 mm hole (documentation only), 6 mm plunge, 5 mm safe Z, 200 mm/min. No spindle commands – run the drill by hand. Scale length and fret count start from the designer's values.
 
 ![Fret Template](docs/img/template.png)
 

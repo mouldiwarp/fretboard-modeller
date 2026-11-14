@@ -16,8 +16,9 @@ public struct FretboardParameters: Equatable, Sendable, Codable {
     public var hasSpokeWheelTrussRod: Bool = true
     /// Board length past the last fret when a spoke-wheel truss rod is used (at least `minimumExtension`).
     public var trussRodExtension: Double = 9.0
-    /// Added to the length at the narrow (nut) end.
-    public var nutThickness: Double = 0.0
+    /// Fender-style nut: the board runs this far past the zero fret so a Fender nut can sit on it. A Gibson-style
+    /// board (false) stops at the zero fret.
+    public var fenderNut: Bool = false
     public var radiusFirstFretInches: Double = 9.5
     public var radiusLastFretInches: Double = 14.0
     /// Thickest point of the board (on the centre line).
@@ -31,6 +32,13 @@ public struct FretboardParameters: Equatable, Sendable, Codable {
 
     public init() {}
 
+    /// How far a Fender-style board extends past the zero fret.
+    public static let fenderNutExtension = 10.0
+    /// Where the Fender-style nut's second slot sits relative to the zero fret (negative = past it).
+    public static let fenderSlotOffset = -4.0
+
+    /// Board length past the zero fret (the nut end): 0 for Gibson, 10 mm for Fender.
+    public var nutThickness: Double { fenderNut ? Self.fenderNutExtension : 0 }
     public var cornerRadius: Double { cornerDiameter / 2 }
     public var radiusFirstFret: Double { radiusFirstFretInches * Units.mmPerInch }
     public var radiusLastFret: Double { radiusLastFretInches * Units.mmPerInch }
@@ -44,7 +52,6 @@ public struct FretboardParameters: Equatable, Sendable, Codable {
             e.append("Width at the last fret must be at least the nut width (widest end is at the origin).")
         }
         if !(1...40).contains(fretCount) { e.append("Fret count must be between 1 and 40.") }
-        if nutThickness < 0 { e.append("Nut thickness cannot be negative.") }
         if thickness <= 0 { e.append("Thickness must be positive.") }
         if cornerDiameter < 0 { e.append("Corner diameter cannot be negative.") }
         if radiusFirstFretInches <= 0 || radiusLastFretInches <= 0 {

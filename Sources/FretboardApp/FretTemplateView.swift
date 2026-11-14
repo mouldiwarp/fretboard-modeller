@@ -8,10 +8,11 @@ struct FretTemplateView: View {
     @EnvironmentObject var store: ModelStore
     @State private var scaleLength = AppDefaults.shared.template.params.scaleLength
     @State private var fretCount = AppDefaults.shared.template.params.fretCount
+    @State private var fenderNut = AppDefaults.shared.template.params.fenderNut
     @State private var settings = AppDefaults.shared.file.fretTemplate
     @State private var synced = false
 
-    private var marks: [FretMark] { FretTemplate.positions(scaleLength: scaleLength, fretCount: fretCount) }
+    private var marks: [FretMark] { FretTemplate.positions(scaleLength: scaleLength, fretCount: fretCount, fenderNut: fenderNut) }
     private var gcode: String { FretTemplate.gcode(scaleLength: scaleLength, marks: marks, settings: settings) }
 
     var body: some View {
@@ -29,6 +30,7 @@ struct FretTemplateView: View {
     private func syncFromDesigner() {
         scaleLength = store.params.scaleLength
         fretCount = store.params.fretCount
+        fenderNut = store.params.fenderNut
     }
 
     private var settingsPanel: some View {
@@ -37,6 +39,7 @@ struct FretTemplateView: View {
             NumberField(title: "Scale length", value: $scaleLength)
             Text(String(format: "= %.3f in", scaleLength / 25.4)).font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
             LampStepper(title: "Frets", value: $fretCount, range: 1...36)
+            LampCheck(text: "Fender-style nut", on: $fenderNut, detail: "Adds fret -1: a second slot 4 mm past the nut (X-4)")
             LatchButton(title: "USE DESIGNER VALUES", on: false, height: 22) { syncFromDesigner() }
             SectionLabel("Marker holes").padding(.top, 4)
             NumberField(title: "Hole diameter", value: $settings.holeDiameter)
@@ -69,7 +72,7 @@ struct FretTemplateView: View {
                         HStack {
                             Text("\(m.id)").frame(width: 40, alignment: .leading)
                             Text(String(format: "%.2f", m.distanceFromNut)).foregroundStyle(Theme.amber).frame(maxWidth: .infinity, alignment: .trailing)
-                            Text(m.id == 0 ? "–" : String(format: "%.2f", m.spacingFromPrevious)).frame(maxWidth: .infinity, alignment: .trailing)
+                            Text(m.id == marks.first?.id ? "–" : String(format: "%.2f", m.spacingFromPrevious)).frame(maxWidth: .infinity, alignment: .trailing)
                         }
                         .font(.system(size: 12, design: .monospaced))
                     }

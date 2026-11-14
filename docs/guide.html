@@ -29,7 +29,7 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <tr><td>Scale length</td><td>In mm; the inch equivalent is shown, and PRESETS offers common scales.</td></tr>
 <tr><td>Frets</td><td>Number of frets (1–36).</td></tr>
 <tr><td>At nut / at last fret</td><td>Board width at the nut and at the last fret; the board tapers linearly between them.</td></tr>
-<tr><td>Nut thickness</td><td>Extra length added past the nut at the narrow end (default 0 mm).</td></tr>
+<tr><td>Fender-style nut</td><td>Off = Gibson style, the board stops at the 0 fret. On = Fender style, the board extends 10 mm past the 0 fret (default off).</td></tr>
 <tr><td>Surface radius</td><td>Radius in inches at the first and last fret. Equal values = constant radius; different values = compound radius.</td></tr>
 <tr><td>Max thickness</td><td>Thickness on the centre line (7 mm default). With a compound radius the centre-line thickness stays constant and the edges get thinner toward the wide end.</td></tr>
 <tr><td>Corner diameter</td><td>Rounding of the two wide-end corners (9.5 mm default). The narrow end has hard corners.</td></tr>
@@ -80,7 +80,7 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 
 <h2 class="pb">4. Fret Template</h2>
 <img src="img/template.png">
-<p>Creates the drilled-hole template used to position a jig for cutting fret slots on a chop saw. Fret positions come from <code>d = L · (1 − 1/2<sup>n/12</sup>)</code>, measured from the nut. Fret 0 is X0 and all holes lie on Y0.</p>
+<p>Creates the drilled-hole template used to position a jig for cutting fret slots on a chop saw. Fret positions come from <code>d = L · (1 − 1/2<sup>n/12</sup>)</code>, measured from the nut. Fret 0 is X0 and all holes lie on Y0. Tick <b>Fender-style nut</b> (it follows the Designer) to add fret −1, a second slot 4 mm past the nut at X−4.</p>
 <table><tr><th>Setting</th><th>Default</th></tr>
 <tr><td>Scale length / frets</td><td>Taken from the designer; <b>USE DESIGNER VALUES</b> resets them</td></tr>
 <tr><td>Hole diameter</td><td>4 mm (written as a comment only – drill with a 4 mm bit)</td></tr>

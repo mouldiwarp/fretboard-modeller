@@ -142,7 +142,8 @@ struct SetupPanel: View {
                 SectionLabel("Width").padding(.top, 4)
                 NumberField(title: "At nut (narrow)", value: $store.params.nutWidth)
                 NumberField(title: "At last fret (wide)", value: $store.params.lastFretWidth)
-                NumberField(title: "Nut thickness", value: $store.params.nutThickness)
+                LampCheck(text: "Fender-style nut", on: $store.params.fenderNut,
+                          detail: store.params.fenderNut ? "Board extends 10 mm past the 0 fret" : "Gibson-style: board stops at the 0 fret")
 
                 SectionLabel("Surface radius").padding(.top, 4)
                 NumberField(title: "At first fret", value: $store.params.radiusFirstFretInches, unit: "in")

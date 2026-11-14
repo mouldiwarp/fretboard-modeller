@@ -21,13 +21,18 @@ public enum FretTemplate {
     }
 
     /// Positions of fret 0 (nut) ... fretCount, in mm: d(n) = L (1 - 1 / 2^(n/12)).
-    public static func positions(scaleLength: Double, fretCount: Int) -> [FretMark] {
+    /// With `fenderNut`, fret -1 is added first: the Fender nut's second slot, 4 mm past the zero fret (X-4).
+    public static func positions(scaleLength: Double, fretCount: Int, fenderNut: Bool = false) -> [FretMark] {
         guard scaleLength > 0, fretCount > 0 else { return [] }
         var out: [FretMark] = []
         var previous = 0.0
+        if fenderNut {
+            previous = FretboardParameters.fenderSlotOffset
+            out.append(FretMark(id: -1, distanceFromNut: previous, spacingFromPrevious: 0))
+        }
         for n in 0...fretCount {
             let d = scaleLength * (1 - 1 / pow(2, Double(n) / 12))
-            out.append(FretMark(id: n, distanceFromNut: d, spacingFromPrevious: n == 0 ? 0 : d - previous))
+            out.append(FretMark(id: n, distanceFromNut: d, spacingFromPrevious: out.isEmpty ? 0 : d - previous))
             previous = d
         }
         return out
@@ -39,7 +44,7 @@ public enum FretTemplate {
         var g = ""
         g += c("Fret Template Builder - GRBL G-code") + "\n"
         g += c("Scale Length: \(f(scaleLength / 25.4)) in / \(f(scaleLength)) mm") + "\n"
-        g += c("Fret Count: \(marks.count - 1)") + "\n"
+        g += c("Fret Count: \(marks.filter { $0.id >= 1 }.count)") + "\n"
         g += c("Hole Diameter: \(f(s.holeDiameter)) mm - documentation only") + "\n\n"
         g += "G21\nG90\n"
         for m in marks {
