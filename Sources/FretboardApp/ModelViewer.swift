@@ -256,6 +256,21 @@ struct ModelViewer: NSViewRepresentable {
             segs.append((SIMD3(L.xNut, -hwN, L.topZ(x: L.xNut, y: -hwN) + 0.05),
                          SIMD3(L.xNut, hwN, L.topZ(x: L.xNut, y: hwN) + 0.05)))
             fretNode.addChildNode(Self.lines(segs, color: NSColor(calibratedRed: 0.85, green: 0.85, blue: 0.9, alpha: 1)))
+
+            // Fender-style nut: mark the 0 fret and the fret -1 nut slot (4 mm past it) in amber.
+            if L.params.fenderNut {
+                var nutSegs: [(SIMD3<Double>, SIMD3<Double>)] = []
+                for x in [L.xNut, L.xNut - FretboardParameters.fenderSlotOffset] {
+                    let hw = L.taperHalfWidth(at: x)
+                    let steps = 40
+                    for s in 0..<steps {
+                        let y0 = -hw + 2 * hw * Double(s) / Double(steps)
+                        let y1 = -hw + 2 * hw * Double(s + 1) / Double(steps)
+                        nutSegs.append((SIMD3(x, y0, L.topZ(x: x, y: y0) + 0.1), SIMD3(x, y1, L.topZ(x: x, y: y1) + 0.1)))
+                    }
+                }
+                fretNode.addChildNode(Self.lines(nutSegs, color: NSColor(calibratedRed: 1.0, green: 0.72, blue: 0.2, alpha: 1)))
+            }
         }
 
         func addDimensions(_ L: FretboardLayout) {
