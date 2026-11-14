@@ -2,7 +2,7 @@ import SwiftUI
 import simd
 import FretboardKit
 
-/// The Toolpath tab: WorkBee G-code generation with animated playback.
+/// The Toolpath tab: G-code generation with animated playback.
 struct ToolpathView: View {
     @EnvironmentObject var store: ModelStore
     @EnvironmentObject var tp: ToolpathStore
@@ -174,7 +174,16 @@ struct CNCSettingsPanel: View {
                 Text("Z0 is the top of the blank. The board bottom is the blank bottom.")
                     .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
 
-                SectionLabel("Feeds (WorkBee Z1+)").padding(.top, 4)
+                SectionLabel("Machine").padding(.top, 4)
+                HStack(spacing: 4) {
+                    ForEach(Machine.allCases) { m in
+                        LatchButton(title: m.name.uppercased(), on: tp.settings.machine == m) { tp.settings.select(m) }
+                    }
+                }
+                Text("\(tp.settings.machine.controller) G-code. Choosing a machine loads its starting feeds and spindle speed; edit them below.")
+                    .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
+
+                SectionLabel("Feeds").padding(.top, 4)
                 NumberField(title: "X/Y cutting", value: $tp.settings.xyFeed, unit: "mm/min")
                 NumberField(title: "Z cutting", value: $tp.settings.zFeed, unit: "mm/min")
                 NumberField(title: "Fast travel", value: $tp.settings.rapidFeed, unit: "mm/min")

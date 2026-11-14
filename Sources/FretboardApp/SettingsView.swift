@@ -114,6 +114,14 @@ struct SettingsView: View {
 
     private var cutter: some View {
         Group {
+            FieldCaption("Machine")
+            HStack(spacing: 4) {
+                ForEach(Machine.allCases) { m in
+                    LatchButton(title: m.name.uppercased(), on: defaults.file.project.cnc.machine == m) {
+                        defaults.file.project.cnc.select(m)
+                    }
+                }
+            }
             num("Cutter diameter", P.appending(path: \.cnc.cutterDiameter))
             num("X/Y feed", P.appending(path: \.cnc.xyFeed), "mm/min")
             num("Z feed", P.appending(path: \.cnc.zFeed), "mm/min")

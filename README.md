@@ -4,7 +4,7 @@ A native macOS app (SwiftUI + SceneKit) for making guitar fretboards. It has fou
 
 1. **Designer** – builds a dimensionally accurate fretboard solid, lets you inspect and measure it, and exports a binary STL (millimetres).
 2. **Markers** – plans fret dots and a custom 12th-fret inlay traced from an image, cuts them into the model and STL, and writes their own G-code files.
-3. **Toolpath** – generates WorkBee Z1+ (Duet / RepRapFirmware) G-code to machine the board from a blank, with animated playback.
+3. **Toolpath** – generates G-code for the Ooznest WorkBee Z1+ (Duet / RepRapFirmware) or the FoxAlien XE-Pro Ultra (GRBL) to machine the board from a blank, with animated playback.
 4. **Fret Template** – generates marker-hole G-code for the jig used to cut fret slots on a chop saw.
 
 A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`](docs/Fretboard-Modeller-User-Guide.pdf).
@@ -42,7 +42,7 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
 ## Toolpath (CNC)
 The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 1000× with a moving cutter and live X/Y/Z/feed readout.
 
-- **Machine:** Ooznest WorkBee Z1+, Duet / RepRapFirmware dialect. Work origin: X0 = heel edge of the board, Y0 = board centre line, Z0 = top of the blank. Cutter: 6 mm flat end mill.
+- **Machines:** choose in the Toolpath tab (or set the default on the Defaults page). *Ooznest WorkBee Z1+*: Duet / RepRapFirmware dialect, semicolon comments. *FoxAlien XE-Pro Ultra* (GRBL, 1.5 kW VFD spindle, USB or offline controller): `G94`/`G54` header, `M3 S<rpm>` then a 5 s `G4` spin-up, `(parenthesis)` comments on their own lines, no `F` on rapids, ends `M5` / `M2`. Choosing a machine loads its starting feeds and spindle speed (FoxAlien: 2000 / 800 / 5000 mm/min, 18000 rpm), all editable. Work origin: X0 = heel edge of the board, Y0 = board centre line, Z0 = top of the blank. Cutter: 6 mm flat end mill.
 - **Feeds:** X/Y cutting 1000 mm/min, Z cutting 800 mm/min, fast travel configurable (default 2500 mm/min is a placeholder – set it to your machine's maximum).
 - **Blank:** set the blank length, width, thickness and where the board sits in it before generating. The blank thickness is a *minimum*: it must be at least board thickness + material left + 0.5 mm so there is always a roughing pass. The path is clipped to the blank and checked against it.
 - **Sequence** (all aimed at reducing splitting):

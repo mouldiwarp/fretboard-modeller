@@ -4,6 +4,8 @@ import simd
 /// CNC job settings. Machine coordinates: X/Y match the model (X0 = heel edge, Y0 = board centre line),
 /// Z0 = top of the stock, so cutting depths are negative.
 public struct CNCSettings: Equatable, Sendable, Codable {
+    /// Target machine: sets the G-code dialect (Duet/RRF or GRBL).
+    public var machine = Machine.workbee
     /// Flat end mill diameter.
     public var cutterDiameter = 6.0
 
@@ -15,7 +17,7 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     /// Distance from the blank's heel-side edge to the board's heel edge (X0).
     public var stockHeelMargin = 20.0
 
-    // WorkBee Z1+ motion limits
+    // Motion limits (starting values come from the selected machine)
     public var xyFeed = 1000.0           // mm/min, X/Y cutting
     public var zFeed = 800.0             // mm/min, Z cutting (plunges)
     /// Fast travel. Default is Ooznest's documented maximum feed rate; set it to your machine's configured maximum.
@@ -49,7 +51,7 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     public var outlineTrim = 0.0
     /// Runs the finishing outline cut twice. The second lap removes what the tool pushed away on the first.
     public var outlineSpringPass = false
-    /// Spindle speed for M3 (0 = no spindle commands, e.g. a manually controlled router).
+    /// Spindle speed for M3 (0 = no spindle commands, e.g. a manually controlled router). GRBL spindles use S as rpm.
     public var spindleRPM = 0
 
     public init() {}

@@ -26,7 +26,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .designer: "Parametric fretboard STL"
         case .markers: "Fret dots & 12th fret inlay"
-        case .toolpath: "WorkBee Z1+ · G-code"
+        case .toolpath: "G-code · WorkBee Z1+ or FoxAlien XE-Pro Ultra"
         case .template: "Chop-saw jig · marker-hole G-code"
         case .settings: "Starting values for every setting"
         }

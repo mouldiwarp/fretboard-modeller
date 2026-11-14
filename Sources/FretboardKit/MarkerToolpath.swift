@@ -169,7 +169,7 @@ public enum MarkerToolpath {
         let ms = machineSettings(cnc, cutter: s.cutterDiameter, xy: s.xyFeed, z: s.plungeFeed, safeZ: s.safeZ, rpm: s.spindleRPM)
         let tp = Toolpath(start: SIMD3(0, 0, s.safeZ), moves: mv.moves, settings: ms)
         var h: [String] = []
-        h.append("; Fretboard Modeller - fret marker dots - WorkBee Z1+ (Duet / RepRapFirmware)")
+        h.append("; Fretboard Modeller - fret marker dots - \(cnc.machine.title)")
         h.append("; Work origin: SAME AS THE BOARD JOB - X0 = heel edge of board, Y0 = board centre line, Z0 = TOP of original stock")
         h.append(String(format: "; Stock %.2f mm thick (from the board job). Run after surfacing, before the board is released from its tabs.", T))
         h.append(String(format: "; Cutter: %.2f mm flat end mill. %d dots, %.2f mm diameter, %.2f mm deep below the surface at each centre (flat floor).",
@@ -348,7 +348,7 @@ public enum MarkerToolpath {
         let ms = machineSettings(cnc, cutter: s.cutterDiameter, xy: s.xyFeed, z: s.plungeFeed, safeZ: s.safeZ, rpm: s.spindleRPM)
         let tp = Toolpath(start: SIMD3(0, 0, s.safeZ), moves: mv.moves, settings: ms)
         var hd: [String] = []
-        hd.append("; Fretboard Modeller - fret \(m.inlay.fret) inlay pocket - WorkBee Z1+ (Duet / RepRapFirmware)")
+        hd.append("; Fretboard Modeller - fret \(m.inlay.fret) inlay pocket - \(cnc.machine.title)")
         if s.origin == .board {
             hd.append("; Work origin: SAME AS THE BOARD JOB - X0 = heel edge of board, Y0 = board centre line, Z0 = TOP of original stock")
             hd.append(String(format: "; Stock %.2f mm thick (from the board job). Run after surfacing, before the board is released from its tabs.", T))

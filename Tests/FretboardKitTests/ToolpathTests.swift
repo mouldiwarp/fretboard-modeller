@@ -396,3 +396,25 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     params["nutThickness"] = 3.0; params.removeValue(forKey: "fenderNut"); old["params"] = params
     #expect(try ProjectFile.decode(JSONSerialization.data(withJSONObject: old)).params.fenderNut)
 }
+
+@Test func foxAlienWritesGRBLDialect() {
+    var p = FretboardParameters()
+    p.hasSpokeWheelTrussRod = false
+    var s = CNCSettings()
+    s.select(.foxalien)
+    #expect(s.machine == .foxalien && s.spindleRPM == 18000 && s.rapidFeed == 5000)
+    let t = ToolpathGenerator.generate(layout: FretboardLayout(p), settings: s)
+    let g = GCodeWriter.write(t, params: p)
+    let lines = g.split(separator: "\n").map(String.init)
+    #expect(lines.contains("M3 S18000") && lines.contains("G4 P5") && lines.contains("G54") && lines.last == "M2")
+    #expect(!g.contains(";"))                                        // parenthesis comments only
+    #expect(!lines.contains { $0.hasPrefix("G0") && $0.contains(" F") })   // GRBL rapids carry no F
+    #expect(lines.contains { $0.hasPrefix("G1") && $0.contains(" F") })
+    #expect(lines.first!.hasPrefix("(") && lines.first!.contains("GRBL"))
+    #expect(lines.filter { $0.hasPrefix("(") }.allSatisfy { $0.hasSuffix(")") && $0.count <= 72 })
+
+    // The WorkBee output is unchanged: semicolon comments, F on rapids, M3 with G4 P3000.
+    let w = GCodeWriter.write(ToolpathGenerator.generate(layout: FretboardLayout(p), settings: {
+        var x = CNCSettings(); x.spindleRPM = 12000; return x }()), params: p)
+    #expect(w.contains("G4 P3000") && w.contains("; ---- ") && w.contains("G0 Z5 F2500"))
+}

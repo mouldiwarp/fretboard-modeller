@@ -1,12 +1,12 @@
 import Foundation
 import simd
 
-/// G-code for the Ooznest WorkBee Z1+ (Duet / RepRapFirmware dialect). Units are mm, absolute positioning.
+/// G-code for the WorkBee Z1+ (Duet / RepRapFirmware) or the FoxAlien XE-Pro Ultra (GRBL). Units are mm, absolute positioning.
 public enum GCodeWriter {
     public static func write(_ t: Toolpath, params: FretboardParameters? = nil) -> String {
         let s = t.settings
         var out: [String] = []
-        out.append("; Fretboard Modeller - WorkBee Z1+ (Duet / RepRapFirmware)")
+        out.append("; Fretboard Modeller - \(s.machine.title)")
         if let p = params {
             out.append(String(format: "; Scale %.1f mm, %d frets, nut %.2f mm, last fret %.2f mm, thickness %.2f mm",
                               p.scaleLength, p.fretCount, p.nutWidth, p.lastFretWidth, p.thickness))
@@ -26,40 +26,54 @@ public enum GCodeWriter {
     }
 
     /// Writes the moves with the given comment lines (each starting with "; ") as the header.
+    /// GRBL machines get (parenthesis) comments on their own lines only, so offline controllers parse them safely.
     public static func write(_ t: Toolpath, header: [String]) -> String {
         let s = t.settings
-        var out = header
-        out.append("G21        ; millimetres")
-        out.append("G90        ; absolute positioning")
-        out.append("G17        ; XY plane")
+        let grbl = s.machine.usesGRBL
+        func cmt(_ text: String) -> String {
+            guard grbl else { return "; " + text }
+            let clean = text.replacingOccurrences(of: ";", with: ",").replacingOccurrences(of: "(", with: "[").replacingOccurrences(of: ")", with: "]")
+            return "(" + String(clean.prefix(70)) + ")"
+        }
+        func code(_ line: String, _ note: String) -> String { grbl ? line : line.padding(toLength: 11, withPad: " ", startingAt: 0) + " ; " + note }
+        var out = header.map { $0.hasPrefix("; ") ? cmt(String($0.dropFirst(2))) : $0 }
+        out.append(code("G21", "millimetres"))
+        out.append(code("G90", "absolute positioning"))
+        out.append(code("G17", "XY plane"))
+        if grbl { out.append("G94"); out.append("G54") }
         if s.spindleRPM > 0 {
             out.append("M3 S\(s.spindleRPM)")
-            out.append("G4 P3000   ; spindle spin-up")
+            out.append(grbl ? "G4 P\(s.machine.spinUpSeconds)" : "G4 P3000   ; spindle spin-up")
         }
-        out.append(String(format: "G0 Z%@ F%@", n(s.safeZ), n(s.rapidFeed)))
+        func rapidZ() -> String { grbl ? "G0 Z" + n(s.safeZ) : String(format: "G0 Z%@ F%@", n(s.safeZ), n(s.rapidFeed)) }
+        out.append(rapidZ())
 
         var cur: SIMD3<Double>? = SIMD3(0, 0, s.safeZ)
-        var feed = s.rapidFeed
+        var feed = grbl ? -1 : s.rapidFeed
         var op: CutOperation?
         for m in t.moves {
             if op != m.op {
                 op = m.op
                 out.append("")
-                out.append("; ---- \(m.op.title.uppercased()) ----")
+                out.append(cmt("---- \(m.op.title.uppercased()) ----"))
             }
             var line = m.kind == .rapid ? "G0" : "G1"
             if cur == nil || abs(m.to.x - cur!.x) > 5e-4 { line += " X" + n(m.to.x) }
             if cur == nil || abs(m.to.y - cur!.y) > 5e-4 { line += " Y" + n(m.to.y) }
             if cur == nil || abs(m.to.z - cur!.z) > 5e-4 { line += " Z" + n(m.to.z) }
             if line.count <= 2 { continue }                 // no movement
-            if abs(m.feed - feed) > 0.5 || m.kind == .rapid { line += " F" + n(m.feed); feed = m.feed }
+            if grbl {
+                // GRBL rapids run at the machine's configured maximum, so F is only for cutting moves.
+                if m.kind == .cut && abs(m.feed - feed) > 0.5 { line += " F" + n(m.feed); feed = m.feed }
+            } else if abs(m.feed - feed) > 0.5 || m.kind == .rapid { line += " F" + n(m.feed); feed = m.feed }
             out.append(line)
             cur = m.to
         }
         out.append("")
-        out.append("; ---- END ----")
-        out.append(String(format: "G0 Z%@ F%@", n(s.safeZ), n(s.rapidFeed)))
+        out.append(cmt("---- END ----"))
+        out.append(rapidZ())
         if s.spindleRPM > 0 { out.append("M5") }
+        if grbl { out.append("M2") }
         return out.joined(separator: "\n") + "\n"
     }
 
