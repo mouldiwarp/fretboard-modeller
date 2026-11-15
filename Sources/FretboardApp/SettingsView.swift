@@ -7,6 +7,7 @@ struct SettingsView: View {
     @ObservedObject private var defaults = AppDefaults.shared
     @State private var frets = ""
     @State private var doubles = ""
+    @AppStorage(GCodeHub.urlKey) private var hubURL = ""
 
     private typealias KP<V> = WritableKeyPath<DefaultsFile, V>
     private let P = \DefaultsFile.project
@@ -28,9 +29,22 @@ struct SettingsView: View {
                     card("Strings & marker layout") { strings }
                     card("Inlay image trace") { trace }
                     card("Fret template") { template }
+                    card("GCode Controller") { controller }
                 }
             }
             .padding(14)
+        }
+    }
+
+    // MARK: GCode Controller
+
+    private var controller: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField(GCodeHub.defaultURL, text: $hubURL)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12, design: .monospaced))
+            Text("Where the SEND buttons deliver G-code. Leave empty if the GCode Controller hub runs on this Mac.")
+                .font(Theme.heading(10.5)).foregroundStyle(Theme.dim).fixedSize(horizontal: false, vertical: true)
         }
     }
 

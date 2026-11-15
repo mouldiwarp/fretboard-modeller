@@ -61,6 +61,9 @@ Ported from the standalone Fret Template Builder. Computes fret positions from t
 
 ![Fret Template](docs/img/template.png)
 
+## Sending to GCode Controller
+Each G-code tab (Toolpath, Markers dots and inlay, Fret Template) has a **SEND** button next to **EXPORT**. It delivers the file straight to the library of [GCode Controller](https://github.com/mouldiwarp/gcode-controller), a networked GRBL sender, ready to run on the machine. The address defaults to `http://localhost:8080` (the hub on this Mac) and can be changed in **Settings → GCode Controller**. Out-of-date G-code gets the same Update / Send Old prompt as Export.
+
 ## Build and run
 ```sh
 swift run FretboardApp          # run from the command line

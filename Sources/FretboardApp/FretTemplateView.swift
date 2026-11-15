@@ -53,7 +53,13 @@ struct FretTemplateView: View {
             Text("Fret 0 (the nut) is X0; holes run along Y0. No spindle commands, so run the drill by hand. Hole diameter is documentation only.")
                 .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
             Spacer(minLength: 0)
-            BigLampButton(title: "EXPORT G-CODE", systemImage: "square.and.arrow.up", enabled: !marks.isEmpty) { export() }
+            HStack(spacing: 8) {
+                BigLampButton(title: "EXPORT G-CODE", systemImage: "square.and.arrow.up", enabled: !marks.isEmpty) { export() }
+                BigLampButton(title: "SEND", systemImage: "paperplane", tint: Theme.haze, lit: false, enabled: !marks.isEmpty) {
+                    sendToGCodeController(name: fileName, content: gcode)
+                }
+                .help("Send to GCode Controller at \(GCodeHub.address)")
+            }
         }
         .padding(12).frame(maxHeight: .infinity, alignment: .top).gmCard()
     }
@@ -93,10 +99,12 @@ struct FretTemplateView: View {
         .padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).gmCard()
     }
 
+    private var fileName: String { String(format: "fret-slot-template-%.1f-%d.nc", scaleLength / 25.4, fretCount) }
+
     private func export() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "nc") ?? .plainText]
-        panel.nameFieldStringValue = String(format: "fret-slot-template-%.1f-%d.nc", scaleLength / 25.4, fretCount)
+        panel.nameFieldStringValue = fileName
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { try gcode.write(to: url, atomically: true, encoding: .utf8) } catch { NSAlert(error: error).runModal() }
     }

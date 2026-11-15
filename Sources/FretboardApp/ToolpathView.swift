@@ -247,6 +247,12 @@ struct CNCSettingsPanel: View {
                                   lit: false, enabled: tp.toolpath != nil && !tp.isStale(for: store.params)) {
                         tp.exportGCode(params: tp.generatedParams ?? store.params)
                     }
+                    BigLampButton(title: "SEND", systemImage: "paperplane", tint: Theme.haze,
+                                  lit: false, enabled: tp.toolpath != nil && !tp.isStale(for: store.params)) {
+                        let p = tp.generatedParams ?? store.params
+                        sendToGCodeController(name: ToolpathStore.fileName(p), content: tp.gcode)
+                    }
+                    .help("Send to GCode Controller at \(GCodeHub.address)")
                 }
                 .padding(.top, 4)
             }

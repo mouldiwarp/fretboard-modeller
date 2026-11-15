@@ -359,7 +359,7 @@ struct MarkerJobsPanel: View {
     }
 
     /// Exports, first asking what to do if the G-code no longer matches the markers.
-    private func export(_ job: MarkerJob?, name: String, stale: Bool, canGenerate: Bool) {
+    private func export(_ job: MarkerJob?, name: String, stale: Bool, canGenerate: Bool, send: Bool = false) {
         if stale {
             let a = NSAlert()
             a.messageText = "This G-code is out of date"
@@ -367,14 +367,18 @@ struct MarkerJobsPanel: View {
                 ? "The markers or job settings changed after it was generated, so the file would not match the model. Update it, then export."
                 : "The markers or job settings changed after it was generated, and the current markers can't be cut. Exporting now writes the old G-code."
             if canGenerate { a.addButton(withTitle: "Update") }
-            a.addButton(withTitle: "Export Old G-code")
+            a.addButton(withTitle: send ? "Send Old G-code" : "Export Old G-code")
             a.addButton(withTitle: "Cancel")
             let r = a.runModal()
             if canGenerate && r == .alertFirstButtonReturn { mk.generate(store, cnc: tp.settings); return }
             let exportOld: NSApplication.ModalResponse = canGenerate ? .alertSecondButtonReturn : .alertFirstButtonReturn
             guard r == exportOld else { return }
         }
-        mk.export(job, name: name)
+        if send {
+            if let job { sendToGCodeController(name: name, content: job.gcode) }
+        } else {
+            mk.export(job, name: name)
+        }
     }
 
     var body: some View {
@@ -409,9 +413,16 @@ struct MarkerJobsPanel: View {
                         Text($0).font(Theme.heading(10.5)).foregroundStyle(Theme.danger)
                     }
                     if let j = mk.dotsJob { summary(j) }
-                    BigLampButton(title: "EXPORT DOTS G-CODE", systemImage: "square.and.arrow.up", enabled: mk.dotsJob != nil) {
-                        export(mk.dotsJob, name: String(format: "fret_dots_%.0fmm.nc", store.params.scaleLength),
-                               stale: stale, canGenerate: canGenerate)
+                    HStack(spacing: 8) {
+                        BigLampButton(title: "EXPORT DOTS G-CODE", systemImage: "square.and.arrow.up", enabled: mk.dotsJob != nil) {
+                            export(mk.dotsJob, name: String(format: "fret_dots_%.0fmm.nc", store.params.scaleLength),
+                                   stale: stale, canGenerate: canGenerate)
+                        }
+                        BigLampButton(title: "SEND", systemImage: "paperplane", tint: Theme.haze, lit: false, enabled: mk.dotsJob != nil) {
+                            export(mk.dotsJob, name: String(format: "fret_dots_%.0fmm.nc", store.params.scaleLength),
+                                   stale: stale, canGenerate: canGenerate, send: true)
+                        }
+                        .help("Send to GCode Controller at \(GCodeHub.address)")
                     }
                 }
 
@@ -447,9 +458,15 @@ struct MarkerJobsPanel: View {
                         summary(j)
                         ForEach(j.warnings, id: \.self) { Text($0).font(Theme.heading(10.5)).foregroundStyle(Theme.warn) }
                     }
-                    BigLampButton(title: "EXPORT INLAY G-CODE", systemImage: "square.and.arrow.up", enabled: mk.inlayJob != nil) {
-                        export(mk.inlayJob, name: "fret\(store.markers.inlay.fret)_inlay_\(mk.inlay.origin == .board ? "board" : "centre")_zero.nc",
-                               stale: stale, canGenerate: canGenerate)
+                    let inlayName = "fret\(store.markers.inlay.fret)_inlay_\(mk.inlay.origin == .board ? "board" : "centre")_zero.nc"
+                    HStack(spacing: 8) {
+                        BigLampButton(title: "EXPORT INLAY G-CODE", systemImage: "square.and.arrow.up", enabled: mk.inlayJob != nil) {
+                            export(mk.inlayJob, name: inlayName, stale: stale, canGenerate: canGenerate)
+                        }
+                        BigLampButton(title: "SEND", systemImage: "paperplane", tint: Theme.haze, lit: false, enabled: mk.inlayJob != nil) {
+                            export(mk.inlayJob, name: inlayName, stale: stale, canGenerate: canGenerate, send: true)
+                        }
+                        .help("Send to GCode Controller at \(GCodeHub.address)")
                     }
                     Text("Fragile cutter: every entry ramps in along the path, the first loop after each entry runs at the slot feed, and each layer ends with a light finishing pass on the walls. Air-cut first with Z raised.")
                         .font(Theme.heading(10)).foregroundStyle(Theme.dim)

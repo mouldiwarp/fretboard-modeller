@@ -105,11 +105,15 @@ final class ToolpathStore: ObservableObject {
         version += 1
     }
 
+    static func fileName(_ params: FretboardParameters) -> String {
+        String(format: "fretboard_%.0fmm_%dfrets.nc", params.scaleLength, params.fretCount)
+    }
+
     func exportGCode(params: FretboardParameters) {
         guard !gcode.isEmpty else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "nc") ?? .plainText]
-        panel.nameFieldStringValue = String(format: "fretboard_%.0fmm_%dfrets.nc", params.scaleLength, params.fretCount)
+        panel.nameFieldStringValue = Self.fileName(params)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { try gcode.write(to: url, atomically: true, encoding: .utf8) } catch { NSAlert(error: error).runModal() }
     }
