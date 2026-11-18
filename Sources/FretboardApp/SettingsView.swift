@@ -28,6 +28,7 @@ struct SettingsView: View {
                     card("Inlay cutter") { inlayCutter }
                     card("Strings & marker layout") { strings }
                     card("Inlay image trace") { trace }
+                    card("Fender nut slot") { nutSlot }
                     card("Fret template") { template }
                     card("GCode Controller") { controller }
                 }
@@ -104,6 +105,17 @@ struct SettingsView: View {
             num("Radius at last fret", P.appending(path: \.params.radiusLastFretInches), "in")
             flag("Fender-style nut (10 mm past 0 fret)", P.appending(path: \.params.fenderNut))
             num("Wide-end corner Ø", P.appending(path: \.params.cornerDiameter))
+        }
+    }
+
+    private var nutSlot: some View {
+        Group {
+            num("Compression bit (slot width)", P.appending(path: \.cnc.nutSlot.bitDiameter))
+            num("Slot depth", P.appending(path: \.cnc.nutSlot.depth))
+            num("Depth per pass", P.appending(path: \.cnc.nutSlot.depthPerPass))
+            num("Slot feed", P.appending(path: \.cnc.nutSlot.feed), "mm/min")
+            num("Slot plunge feed", P.appending(path: \.cnc.nutSlot.plungeFeed), "mm/min")
+            rpm("Spindle speed (0 = as board)", P.appending(path: \.cnc.nutSlot.spindleRPM))
         }
     }
 

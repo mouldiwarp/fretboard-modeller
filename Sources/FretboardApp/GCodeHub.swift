@@ -74,12 +74,20 @@ enum GCodeHub {
 /// Sends one G-code file to GCode Controller and reports the result, for the SEND buttons.
 @MainActor
 func sendToGCodeController(name: String, content: String) {
+    sendToGCodeController([GCodeHub.File(name: name, content: content)], group: nil)
+}
+
+/// Sends several files as one group, in run order (for example the board job, then the nut slot job).
+@MainActor
+func sendToGCodeController(_ files: [GCodeHub.File], group: String?) {
     Task { @MainActor in
         let alert = NSAlert()
+        let name = files.count == 1 ? files[0].name : "\(files.count) files"
         do {
-            try await GCodeHub.send([GCodeHub.File(name: name, content: content)], source: "Fretboard Modeller", group: nil)
+            try await GCodeHub.send(files, source: "Fretboard Modeller", group: group)
             alert.messageText = "Sent to GCode Controller"
-            alert.informativeText = "\(name) is in the controller's library, ready to run."
+            alert.informativeText = files.count == 1 ? "\(name) is in the controller's library, ready to run."
+                : "\(name) are in the controller's library as \"\(group ?? "")\", in the order to run them."
         } catch {
             alert.alertStyle = .warning
             alert.messageText = "Couldn't send \(name)"

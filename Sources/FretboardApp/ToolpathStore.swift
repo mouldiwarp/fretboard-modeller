@@ -46,7 +46,9 @@ final class ToolpathStore: ObservableObject {
     @Published var settings = CNCSettings()
     @Published private(set) var toolpath: Toolpath?
     @Published private(set) var times: [Double] = []
+    /// Board job G-code. When the board is Fender-style the nut slot is a separate file, `nutGcode`.
     @Published private(set) var gcode = ""
+    @Published private(set) var nutGcode = ""
     @Published private(set) var summary: [OperationSummary] = []
     @Published private(set) var version = 0
     @Published private(set) var isGenerating = false
@@ -63,11 +65,15 @@ final class ToolpathStore: ObservableObject {
         isGenerating = true
         let s = settings
         Task {
-            let result = await Task.detached(priority: .userInitiated) { () -> (Toolpath, [Double], String, [OperationSummary]) in
+            let result = await Task.detached(priority: .userInitiated) { () -> (Toolpath, [Double], String, String, [OperationSummary]) in
                 let layout = FretboardLayout(params)
-                let tp = ToolpathGenerator.generate(layout: layout, settings: s)
+                let board = ToolpathGenerator.generate(layout: layout, settings: s)
+                let text = GCodeWriter.write(board, params: params)
+                // The nut slot is its own job (own bit, own file) but is previewed and timed after the board job.
+                let nut = NutSlotToolpath.generate(layout: layout, settings: s)
+                var tp = board
+                if let nut { tp.moves += nut.toolpath.moves }
                 let times = tp.cumulativeTimes()
-                let text = GCodeWriter.write(tp, params: params)
                 var sums: [OperationSummary] = []
                 for op in CutOperation.allCases {
                     var n = 0, secs = 0.0, len = 0.0
@@ -81,9 +87,9 @@ final class ToolpathStore: ObservableObject {
                     }
                     if n > 0 { sums.append(OperationSummary(op: op, moves: n, seconds: secs, cutLength: len)) }
                 }
-                return (tp, times, text, sums)
+                return (tp, times, text, nut?.gcode ?? "", sums)
             }.value
-            toolpath = result.0; times = result.1; gcode = result.2; summary = result.3
+            toolpath = result.0; times = result.1; gcode = result.2; nutGcode = result.3; summary = result.4
             generatedParams = params; generatedSettings = s
             playback.reset(total: result.1.last ?? 0)
             version += 1
@@ -99,7 +105,7 @@ final class ToolpathStore: ObservableObject {
 
     /// Forgets the generated toolpath (for example after opening a project).
     func clear() {
-        toolpath = nil; times = []; gcode = ""; summary = []
+        toolpath = nil; times = []; gcode = ""; nutGcode = ""; summary = []
         generatedParams = nil; generatedSettings = nil
         playback.reset(total: 0)
         version += 1
@@ -109,8 +115,31 @@ final class ToolpathStore: ObservableObject {
         String(format: "fretboard_%.0fmm_%dfrets.nc", params.scaleLength, params.fretCount)
     }
 
+    static func nutFileName(_ params: FretboardParameters) -> String {
+        fileName(params).replacingOccurrences(of: ".nc", with: "_2_nut_slot.nc")
+    }
+
+    /// The files to run in order: the board job, then (Fender) the nut slot after a tool change.
+    func jobFiles(params: FretboardParameters) -> [(name: String, content: String)] {
+        guard !nutGcode.isEmpty else { return [(Self.fileName(params), gcode)] }
+        return [(Self.fileName(params).replacingOccurrences(of: ".nc", with: "_1_board.nc"), gcode),
+                (Self.nutFileName(params), nutGcode)]
+    }
+
     func exportGCode(params: FretboardParameters) {
         guard !gcode.isEmpty else { return }
+        if !nutGcode.isEmpty {
+            // Two jobs: write both into a folder, numbered in the order to run.
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true
+            panel.prompt = "Export Both"
+            panel.message = "Saves the board job and the nut slot job (run after a tool change) as two G-code files."
+            guard panel.runModal() == .OK, let dir = panel.url else { return }
+            do {
+                for f in jobFiles(params: params) { try f.content.write(to: dir.appendingPathComponent(f.name), atomically: true, encoding: .utf8) }
+            } catch { NSAlert(error: error).runModal() }
+            return
+        }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "nc") ?? .plainText]
         panel.nameFieldStringValue = Self.fileName(params)

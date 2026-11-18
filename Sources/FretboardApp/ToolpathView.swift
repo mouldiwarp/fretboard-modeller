@@ -219,6 +219,18 @@ struct CNCSettingsPanel: View {
                                                                           set: { tp.settings.spindleRPM = max(0, Int($0)) }),
                             unit: "rpm")
 
+                if store.params.fenderNut {
+                    SectionLabel("Nut slot (own bit & file)").padding(.top, 4)
+                    NumberField(title: "Compression bit (slot width)", value: $tp.settings.nutSlot.bitDiameter)
+                    NumberField(title: "Slot depth", value: $tp.settings.nutSlot.depth)
+                    NumberField(title: "Depth per pass", value: $tp.settings.nutSlot.depthPerPass)
+                    NumberField(title: "Slot feed", value: $tp.settings.nutSlot.feed, unit: "mm/min")
+                    NumberField(title: "Slot plunge", value: $tp.settings.nutSlot.plungeFeed, unit: "mm/min")
+                    NumberField(title: "Spindle (0 = as board)", value: Binding(get: { Double(tp.settings.nutSlot.spindleRPM) },
+                                                                               set: { tp.settings.nutSlot.spindleRPM = max(0, Int($0)) }),
+                                unit: "rpm")
+                }
+
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
               }
@@ -243,18 +255,23 @@ struct CNCSettingsPanel: View {
                 HStack(spacing: 8) {
                     BigLampButton(title: tp.isGenerating ? "WORKING…" : "GENERATE", systemImage: "gearshape.2",
                                   enabled: errors.isEmpty && !tp.isGenerating) { tp.generate(params: store.params) }
-                    BigLampButton(title: "EXPORT", systemImage: "square.and.arrow.up", tint: Theme.haze,
+                    BigLampButton(title: tp.nutGcode.isEmpty ? "EXPORT" : "EXPORT 2 FILES", systemImage: "square.and.arrow.up", tint: Theme.haze,
                                   lit: false, enabled: tp.toolpath != nil && !tp.isStale(for: store.params)) {
                         tp.exportGCode(params: tp.generatedParams ?? store.params)
                     }
                     BigLampButton(title: "SEND", systemImage: "paperplane", tint: Theme.haze,
                                   lit: false, enabled: tp.toolpath != nil && !tp.isStale(for: store.params)) {
                         let p = tp.generatedParams ?? store.params
-                        sendToGCodeController(name: ToolpathStore.fileName(p), content: tp.gcode)
+                        sendToGCodeController(tp.jobFiles(params: p).map { GCodeHub.File(name: $0.name, content: $0.content) },
+                                              group: ToolpathStore.fileName(p).replacingOccurrences(of: ".nc", with: ""))
                     }
                     .help("Send to GCode Controller at \(GCodeHub.address)")
                 }
                 .padding(.top, 4)
+                if !tp.nutGcode.isEmpty {
+                    Text("Fender nut: two files. Run the board job, change to the nut slot bit, re-probe Z, then run the nut slot job.")
+                        .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
+                }
             }
             .padding(14)
         }

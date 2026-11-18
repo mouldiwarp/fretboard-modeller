@@ -21,18 +21,13 @@ public enum FretTemplate {
     }
 
     /// Positions of fret 0 (nut) ... fretCount, in mm: d(n) = L (1 - 1 / 2^(n/12)).
-    /// With `fenderNut`, fret -1 is added first: the Fender nut's second slot, 4 mm past the zero fret (X-4).
-    public static func positions(scaleLength: Double, fretCount: Int, fenderNut: Bool = false) -> [FretMark] {
+    public static func positions(scaleLength: Double, fretCount: Int) -> [FretMark] {
         guard scaleLength > 0, fretCount > 0 else { return [] }
         var out: [FretMark] = []
         var previous = 0.0
-        if fenderNut {
-            previous = FretboardParameters.fenderSlotOffset
-            out.append(FretMark(id: -1, distanceFromNut: previous, spacingFromPrevious: 0))
-        }
         for n in 0...fretCount {
             let d = scaleLength * (1 - 1 / pow(2, Double(n) / 12))
-            out.append(FretMark(id: n, distanceFromNut: d, spacingFromPrevious: out.isEmpty ? 0 : d - previous))
+            out.append(FretMark(id: n, distanceFromNut: d, spacingFromPrevious: n == 0 ? 0 : d - previous))
             previous = d
         }
         return out

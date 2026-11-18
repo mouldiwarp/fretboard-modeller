@@ -372,7 +372,7 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     }
 }
 
-@Test func fenderNutExtendsTheBoardTenMillimetresAndAddsFretMinusOne() throws {
+@Test func fenderNutExtendsTheBoardTenMillimetres() throws {
     var p = FretboardParameters()
     let gibson = FretboardLayout(p)
     #expect(gibson.xEnd == gibson.xNut)
@@ -382,13 +382,7 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     #expect(abs(fender.fretX(0) - fender.xNut) < 1e-9)           // the zero fret has not moved
 
     let g = FretTemplate.positions(scaleLength: 647.7, fretCount: 22)
-    #expect(g.first?.id == 0 && g.count == 23)
-    let f = FretTemplate.positions(scaleLength: 647.7, fretCount: 22, fenderNut: true)
-    #expect(f.count == 24 && f[0].id == -1 && f[0].distanceFromNut == -4 && f[1].id == 0)
-    #expect(f[1].spacingFromPrevious == 4)
-    let code = FretTemplate.gcode(scaleLength: 647.7, marks: f, settings: .init())
-    #expect(code.contains("(Fret -1)\nG0 Z5.000\nG0 X-4.000 Y0.000"))
-    #expect(code.contains("(Fret Count: 22)"))
+    #expect(g.first?.id == 0 && g.count == 23)          // the template has no nut-slot holes: the slot is machined instead
 
     // Projects saved with the old free "nut thickness" become Fender when it was non-zero.
     var old = try JSONSerialization.jsonObject(with: ProjectFile().encoded()) as! [String: Any]
@@ -417,4 +411,45 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     let w = GCodeWriter.write(ToolpathGenerator.generate(layout: FretboardLayout(p), settings: {
         var x = CNCSettings(); x.spindleRPM = 12000; return x }()), params: p)
     #expect(w.contains("G4 P3000") && w.contains("; ---- ") && w.contains("G0 Z5 F2500"))
+}
+
+@Test func fenderNutSlotIsItsOwnJobCutWithTheCompressionBit() throws {
+    var p = FretboardParameters()
+    p.hasSpokeWheelTrussRod = false
+    var s = CNCSettings()
+    #expect(NutSlotToolpath.generate(layout: FretboardLayout(p), settings: s) == nil)      // Gibson: no slot job
+    p.fenderNut = true
+    let L = FretboardLayout(p)
+    let job = try #require(NutSlotToolpath.generate(layout: L, settings: s))
+    let tp = job.toolpath
+    #expect(tp.settings.cutterDiameter == 4 && tp.moves.allSatisfy { $0.op == .nutSlot })
+
+    // The channel runs from the zero fret to 4 mm beyond it: the bit centre sits 2 mm past the zero fret.
+    let cuts = tp.moves.filter { $0.kind == .cut }
+    #expect(cuts.allSatisfy { abs($0.to.x - (L.xNut + 2)) < 1e-9 })
+    // Floor: 3 mm below the board top on the centre line (Z0 = stock top); passes of at most 1 mm.
+    let floor = p.thickness - s.stockThickness - 3
+    #expect(abs(cuts.map(\.to.z).min()! - floor) < 1e-9)
+    let levels = Set(cuts.map { ($0.to.z * 1000).rounded() })
+    #expect(levels.count == 3)
+    // Every Y end of a pass is beyond the board edge plus the bit radius, so the slot opens at both sides.
+    let hw = L.taperHalfWidth(at: L.xNut)
+    #expect(cuts.allSatisfy { abs($0.to.y) >= hw + 2 + 0.4 })
+    // Never travels below safe height except by cutting moves (plunges are in the air beyond the board edge).
+    #expect(tp.moves.filter { $0.kind == .rapid }.allSatisfy { $0.to.z >= s.safeZ - 1e-9 })
+
+    let g = job.gcode
+    #expect(g.contains("TOOL CHANGE") && g.contains("Run AFTER the board job") && g.contains("NUT SLOT"))
+
+    // Invalid settings produce no job and an error; a deep slot over the tabs warns.
+    s.nutSlot.depth = p.thickness
+    #expect(NutSlotToolpath.generate(layout: L, settings: s) == nil)
+    #expect(!s.validate(for: p).isEmpty)
+    s.nutSlot.depth = 6.0; s.tabHeight = 1.5
+    #expect(s.warnings(for: p).contains { $0.contains("holding tabs") })
+
+    // Old project files without the setting still open, with the default slot.
+    var old = try JSONSerialization.jsonObject(with: ProjectFile().encoded()) as! [String: Any]
+    var cnc = old["cnc"] as! [String: Any]; cnc.removeValue(forKey: "nutSlot"); old["cnc"] = cnc
+    #expect(try ProjectFile.decode(JSONSerialization.data(withJSONObject: old)).cnc.nutSlot == NutSlotSettings())
 }

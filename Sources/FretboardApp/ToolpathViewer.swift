@@ -12,6 +12,7 @@ func opColor(_ op: CutOperation) -> NSColor {
     case .dotPocket: return NSColor(srgbRed: 1.0, green: 0xB5 / 255, blue: 0x4A / 255, alpha: 1)
     case .inlayClear: return NSColor(srgbRed: 0xC5 / 255, green: 0xA0 / 255, blue: 0x59 / 255, alpha: 1)
     case .inlayFinish: return NSColor(srgbRed: 0x9B / 255, green: 0xD8 / 255, blue: 0x6A / 255, alpha: 1)
+    case .nutSlot: return NSColor(srgbRed: 0xE0 / 255, green: 0x6C / 255, blue: 0x75 / 255, alpha: 1)
     }
 }
 

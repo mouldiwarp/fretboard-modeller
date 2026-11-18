@@ -40,6 +40,8 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
 - Generated toolpaths aren't saved; press GENERATE again after opening. Files from older versions open with defaults for anything they lack; files from a newer version are refused.
 
 ## Toolpath (CNC)
+**Fender-style nut:** the Toolpath tab adds a second job that machines the nut channel at the zero fret: a flat-bottomed slot, the width of the bit (default 4 mm compression bit), running from the 0 fret toward the end of the board, 3 mm deep by default, in 1 mm passes. It runs across the full board width and out into the cleared trench at both ends, so run it **after the board job and a tool change**, with Z re-probed on the top of the blank. The result is two G-code files: `…_1_board.nc` and `…_2_nut_slot.nc` (EXPORT 2 FILES, or SEND to GCode Controller as one group in run order). The preview and run time include both. Slot settings are in the Toolpath tab and the Defaults page.
+
 The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 1000× with a moving cutter and live X/Y/Z/feed readout.
 
 - **G-code dialects:** choose in the Toolpath tab (or set the default on the Defaults page). *Duet / RepRapFirmware* (tested on the Ooznest WorkBee Z1+): semicolon comments. *GRBL* (any GRBL machine, USB sender or offline controller; tested on the FoxAlien XE-Pro Ultra with a VFD spindle): `G94`/`G54` header, `M3 S<rpm>` then a 5 s `G4` spin-up, `(parenthesis)` comments on their own lines, no `F` on rapids, ends `M5` / `M2`. Choosing a dialect loads starting feeds and spindle speed (GRBL: 2000 / 800 / 5000 mm/min, 18000 rpm), all editable. Work origin: X0 = heel edge of the board, Y0 = board centre line, Z0 = top of the blank. Cutter: 6 mm flat end mill.
@@ -57,7 +59,7 @@ The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 10
 ![Toolpath](docs/img/toolpath.png)
 
 ## Fret Template
-Ported from the standalone Fret Template Builder. Computes fret positions from the nut (`d = L·(1 − 1/2^(n/12))`) and writes GRBL-style G-code that drills marker holes on the centre line (Y0) at each fret (fret 0 = X0). For a **Fender-style nut** it adds fret −1, a second slot 4 mm past the nut (X−4). Defaults: 4 mm hole (documentation only), 6 mm plunge, 5 mm safe Z, 200 mm/min. No spindle commands – run the drill by hand. Scale length and fret count start from the designer's values.
+Ported from the standalone Fret Template Builder. Computes fret positions from the nut (`d = L·(1 − 1/2^(n/12))`) and writes GRBL-style G-code that drills marker holes on the centre line (Y0) at each fret (fret 0 = X0). The Fender nut channel is not marked here: with a Fender-style nut the Toolpath tab machines it (see below). Defaults: 4 mm hole (documentation only), 6 mm plunge, 5 mm safe Z, 200 mm/min. No spindle commands – run the drill by hand. Scale length and fret count start from the designer's values.
 
 ![Fret Template](docs/img/template.png)
 

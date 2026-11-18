@@ -51,6 +51,8 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     public var outlineTrim = 0.0
     /// Runs the finishing outline cut twice. The second lap removes what the tool pushed away on the first.
     public var outlineSpringPass = false
+    /// The Fender-style nut channel, cut with its own bit as a second job.
+    public var nutSlot = NutSlotSettings()
     /// Spindle speed for M3 (0 = no spindle commands, e.g. a manually controlled router). GRBL spindles use S as rpm.
     public var spindleRPM = 0
 
@@ -92,6 +94,7 @@ public struct CNCSettings: Equatable, Sendable, Codable {
         }
         if safeZ <= 0 { e.append("Safe Z must be above the stock top.") }
         if abs(outlineTrim) > 1 || cutterRadius - outlineTrim <= 0 { e.append("Outline trim must be within ±1 mm.") }
+        if params.fenderNut { e.append(contentsOf: NutSlotToolpath.validate(nutSlot, params: params)) }
         if trenchWidthFactor < 1 { e.append("Trench width must be at least one cutter diameter.") }
         if tabCount < 0 || tabWidth <= 0 || tabHeight <= 0 || tabHeight >= stockThickness - 1 {
             e.append("Tab settings are not valid.")
@@ -125,6 +128,7 @@ extension CNCSettings {
         for (name, m) in sides where m < need {
             w.append(String(format: "Only %.1f mm of blank at the %@; the roughing trench needs %.1f mm and will run off the blank.", m, name, need))
         }
+        if params.fenderNut { w.append(contentsOf: NutSlotToolpath.warnings(nutSlot, params: params, cnc: self)) }
         return w
     }
 }
@@ -132,6 +136,7 @@ extension CNCSettings {
 public enum CutOperation: Int, CaseIterable, Sendable, Identifiable {
     case roughSurface, roughOutline, finishSurface, finishOutline
     case dotPocket, inlayClear, inlayFinish
+    case nutSlot
     public var id: Int { rawValue }
     public var title: String {
         switch self {
@@ -142,6 +147,7 @@ public enum CutOperation: Int, CaseIterable, Sendable, Identifiable {
         case .dotPocket: return "Dot pockets"
         case .inlayClear: return "Clear inlay pocket"
         case .inlayFinish: return "Finish inlay walls"
+        case .nutSlot: return "Nut slot"
         }
     }
 }
