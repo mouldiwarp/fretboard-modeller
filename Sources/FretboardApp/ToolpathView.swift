@@ -265,7 +265,7 @@ struct CNCSettingsPanel: View {
                         sendToGCodeController(tp.jobFiles(params: p).map { GCodeHub.File(name: $0.name, content: $0.content) },
                                               group: ToolpathStore.fileName(p).replacingOccurrences(of: ".nc", with: ""))
                     }
-                    .help("Send to GCode Controller at \(GCodeHub.address)")
+                    .help("Send to KerfLine at \(GCodeHub.address)")
                 }
                 .padding(.top, 4)
                 if !tp.nutGcode.isEmpty {

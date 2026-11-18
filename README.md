@@ -40,7 +40,7 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
 - Generated toolpaths aren't saved; press GENERATE again after opening. Files from older versions open with defaults for anything they lack; files from a newer version are refused.
 
 ## Toolpath (CNC)
-**Fender-style nut:** the Toolpath tab adds a second job that machines the nut channel at the zero fret: a flat-bottomed slot, the width of the bit (default 4 mm compression bit), running from the 0 fret toward the end of the board, 3 mm deep by default, in very light 0.5 mm passes that run at least one bit width past each board edge (to avoid lips and splits). It runs across the full board width and out into the cleared trench at both ends, so run it **after the board job and a tool change**, with Z re-probed on the top of the blank. The result is two G-code files: `…_1_board.nc` and `…_2_nut_slot.nc` (EXPORT 2 FILES, or SEND to GCode Controller as one group in run order). The preview and run time include both. Slot settings are in the Toolpath tab and the Defaults page. A **NUT SLOT** button (Designer bottom bar and Toolpath playback bar, Fender only) shows or hides a salmon highlight of the channel on the board and, in the Toolpath view, the slot's whole toolpath from the start, before playback reaches it.
+**Fender-style nut:** the Toolpath tab adds a second job that machines the nut channel at the zero fret: a flat-bottomed slot, the width of the bit (default 4 mm compression bit), running from the 0 fret toward the end of the board, 3 mm deep by default, in very light 0.5 mm passes that run at least one bit width past each board edge (to avoid lips and splits). It runs across the full board width and out into the cleared trench at both ends, so run it **after the board job and a tool change**, with Z re-probed on the top of the blank. The result is two G-code files: `…_1_board.nc` and `…_2_nut_slot.nc` (EXPORT 2 FILES, or SEND to KerfLine as one group in run order). The preview and run time include both. Slot settings are in the Toolpath tab and the Defaults page. A **NUT SLOT** button (Designer bottom bar and Toolpath playback bar, Fender only) shows or hides a salmon highlight of the channel on the board and, in the Toolpath view, the slot's whole toolpath from the start, before playback reaches it.
 
 The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 1000× with a moving cutter and live X/Y/Z/feed readout.
 
@@ -63,8 +63,8 @@ Ported from the standalone Fret Template Builder. Computes fret positions from t
 
 ![Fret Template](docs/img/template.png)
 
-## Sending to GCode Controller
-Each G-code tab (Toolpath, Markers dots and inlay, Fret Template) has a **SEND** button next to **EXPORT**. It delivers the file straight to the library of [GCode Controller](https://github.com/mouldiwarp/gcode-controller), a networked GRBL sender, ready to run on the machine. The address defaults to `http://localhost:8080` (the hub on this Mac) and can be changed in **Settings → GCode Controller**. Out-of-date G-code gets the same Update / Send Old prompt as Export.
+## Sending to KerfLine
+Each G-code tab (Toolpath, Markers dots and inlay, Fret Template) has a **SEND** button next to **EXPORT**. It delivers the file straight to the library of [KerfLine](https://github.com/mouldiwarp/kerfline), a networked GRBL sender, ready to run on the machine. The address defaults to `http://localhost:8080` (the hub on this Mac) and can be changed in **Settings → KerfLine**. Out-of-date G-code gets the same Update / Send Old prompt as Export.
 
 ## Build and run
 ```sh

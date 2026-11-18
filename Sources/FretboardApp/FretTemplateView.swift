@@ -55,7 +55,7 @@ struct FretTemplateView: View {
                 BigLampButton(title: "SEND", systemImage: "paperplane", tint: Theme.haze, lit: false, enabled: !marks.isEmpty) {
                     sendToGCodeController(name: fileName, content: gcode)
                 }
-                .help("Send to GCode Controller at \(GCodeHub.address)")
+                .help("Send to KerfLine at \(GCodeHub.address)")
             }
         }
         .padding(12).frame(maxHeight: .infinity, alignment: .top).gmCard()

@@ -422,7 +422,7 @@ struct MarkerJobsPanel: View {
                             export(mk.dotsJob, name: String(format: "fret_dots_%.0fmm.nc", store.params.scaleLength),
                                    stale: stale, canGenerate: canGenerate, send: true)
                         }
-                        .help("Send to GCode Controller at \(GCodeHub.address)")
+                        .help("Send to KerfLine at \(GCodeHub.address)")
                     }
                 }
 
@@ -466,7 +466,7 @@ struct MarkerJobsPanel: View {
                         BigLampButton(title: "SEND", systemImage: "paperplane", tint: Theme.haze, lit: false, enabled: mk.inlayJob != nil) {
                             export(mk.inlayJob, name: inlayName, stale: stale, canGenerate: canGenerate, send: true)
                         }
-                        .help("Send to GCode Controller at \(GCodeHub.address)")
+                        .help("Send to KerfLine at \(GCodeHub.address)")
                     }
                     Text("Fragile cutter: every entry ramps in along the path, the first loop after each entry runs at the slot feed, and each layer ends with a light finishing pass on the walls. Air-cut first with Z raised.")
                         .font(Theme.heading(10)).foregroundStyle(Theme.dim)

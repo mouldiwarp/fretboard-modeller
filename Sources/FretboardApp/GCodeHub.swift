@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Sends G-code straight to a GCode Controller hub (github.com/mouldiwarp/gcode-controller), which
+/// Sends G-code straight to a KerfLine hub (github.com/mouldiwarp/kerfline), which
 /// queues it for the machine. The hub normally runs on this Mac, so the default address is localhost.
 enum GCodeHub {
     static let urlKey = "gcodeHubURL"
@@ -35,7 +35,7 @@ enum GCodeHub {
     static func send(_ files: [File], source: String, group: String?, address override: String? = nil) async throws -> Int {
         let address = resolvedAddress(override)
         guard let base = URL(string: address), base.scheme == "http" || base.scheme == "https" else {
-            throw Failure(message: "The GCode Controller address \"\(address)\" isn't a valid http:// URL. Check it in Settings.")
+            throw Failure(message: "The KerfLine address \"\(address)\" isn't a valid http:// URL. Check it in Settings.")
         }
         let grouped = files.count > 1 ? group : nil
         for (i, f) in files.enumerated() {
@@ -54,12 +54,12 @@ enum GCodeHub {
             do {
                 (data, response) = try await URLSession.shared.upload(for: req, from: Data(f.content.utf8))
             } catch let e as URLError where [.cannotConnectToHost, .cannotFindHost, .timedOut, .networkConnectionLost].contains(e.code) {
-                throw Failure(message: "GCode Controller isn't reachable at \(address). Start the hub (Start Hub.command), then try again.")
+                throw Failure(message: "KerfLine isn't reachable at \(address). Open KerfLine on that Mac, then try again.")
             }
-            guard let http = response as? HTTPURLResponse else { throw Failure(message: "No reply from GCode Controller.") }
+            guard let http = response as? HTTPURLResponse else { throw Failure(message: "No reply from KerfLine.") }
             if http.statusCode != 201 && http.statusCode != 200 {
                 let reason = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
-                throw Failure(message: "GCode Controller refused \(f.name): \(reason ?? "HTTP \(http.statusCode)")")
+                throw Failure(message: "KerfLine refused \(f.name): \(reason ?? "HTTP \(http.statusCode)")")
             }
         }
         return files.count
@@ -71,7 +71,7 @@ enum GCodeHub {
 }
 
 
-/// Sends one G-code file to GCode Controller and reports the result, for the SEND buttons.
+/// Sends one G-code file to KerfLine and reports the result, for the SEND buttons.
 @MainActor
 func sendToGCodeController(name: String, content: String) {
     sendToGCodeController([GCodeHub.File(name: name, content: content)], group: nil)
@@ -85,7 +85,7 @@ func sendToGCodeController(_ files: [GCodeHub.File], group: String?) {
         let name = files.count == 1 ? files[0].name : "\(files.count) files"
         do {
             try await GCodeHub.send(files, source: "Fretboard Modeller", group: group)
-            alert.messageText = "Sent to GCode Controller"
+            alert.messageText = "Sent to KerfLine"
             alert.informativeText = files.count == 1 ? "\(name) is in the controller's library, ready to run."
                 : "\(name) are in the controller's library as \"\(group ?? "")\", in the order to run them."
         } catch {

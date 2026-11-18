@@ -30,21 +30,21 @@ struct SettingsView: View {
                     card("Inlay image trace") { trace }
                     card("Fender nut slot") { nutSlot }
                     card("Fret template") { template }
-                    card("GCode Controller") { controller }
+                    card("KerfLine") { controller }
                 }
             }
             .padding(14)
         }
     }
 
-    // MARK: GCode Controller
+    // MARK: KerfLine
 
     private var controller: some View {
         VStack(alignment: .leading, spacing: 6) {
             TextField(GCodeHub.defaultURL, text: $hubURL)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 12, design: .monospaced))
-            Text("Where the SEND buttons deliver G-code. Leave empty if the GCode Controller hub runs on this Mac.")
+            Text("Where the SEND buttons deliver G-code. Leave empty if the KerfLine hub runs on this Mac.")
                 .font(Theme.heading(10.5)).foregroundStyle(Theme.dim).fixedSize(horizontal: false, vertical: true)
         }
     }
