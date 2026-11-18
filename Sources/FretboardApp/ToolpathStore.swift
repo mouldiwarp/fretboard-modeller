@@ -44,6 +44,8 @@ struct OperationSummary: Identifiable {
 @MainActor
 final class ToolpathStore: ObservableObject {
     @Published var settings = CNCSettings()
+    /// Highlight the Fender nut channel in the Designer and Toolpath views.
+    @Published var showNutSlot = true
     @Published private(set) var toolpath: Toolpath?
     @Published private(set) var times: [Double] = []
     /// Board job G-code. When the board is Fender-style the nut slot is a separate file, `nutGcode`.

@@ -70,6 +70,8 @@ struct ModelViewer: NSViewRepresentable {
     let presetToken: Int
     let showFrets: Bool
     let showDimensions: Bool
+    /// Fender-style nut channel to highlight on the board (nil = Gibson, or hidden).
+    var nutSlot: NutSlotSettings? = nil
     @Binding var picks: [SIMD3<Double>]
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -126,6 +128,7 @@ struct ModelViewer: NSViewRepresentable {
             c.frame(preset: preset, layout: layout)
         }
         c.fretNode.isHidden = !showFrets
+        c.updateSlot(layout: layout, bit: nutSlot?.bitDiameter, key: meshVersion)
         c.dimNode.isHidden = !showDimensions
         c.updatePicks(picks)
     }
@@ -139,8 +142,10 @@ struct ModelViewer: NSViewRepresentable {
         let fretNode = SCNNode()
         let dimNode = SCNNode()
         let pickNode = SCNNode()
+        let slotNode = SCNNode()
         let cameraNode = SCNNode()
         weak var view: ZoomSCNView?
+        var slotKey = ""
         var picksBinding: Binding<[SIMD3<Double>]>?
         var builtVersion = -1
         var builtOnce = false
@@ -148,7 +153,48 @@ struct ModelViewer: NSViewRepresentable {
 
         override init() {
             super.init()
-            [boardNode, fretNode, dimNode, pickNode].forEach { modelNode.addChildNode($0) }
+            [boardNode, fretNode, slotNode, dimNode, pickNode].forEach { modelNode.addChildNode($0) }
+        }
+
+        /// Rebuilds the nut channel highlight when the board or the bit changes; removes it when there is none.
+        func updateSlot(layout L: FretboardLayout, bit: Double?, key: Int) {
+            let k = bit.map { "\(key)|\($0)" } ?? ""
+            guard k != slotKey else { return }
+            slotKey = k
+            slotNode.childNodes.forEach { $0.removeFromParentNode() }
+            if let bit { slotNode.addChildNode(Self.nutSlotStrip(L, bit: bit)) }
+        }
+
+        static let slotColor = NSColor(srgbRed: 0xE0 / 255, green: 0x6C / 255, blue: 0x75 / 255, alpha: 1)
+
+        /// The nut channel as a translucent band lying on the board surface (zero fret to `bit` beyond it), with an outline.
+        static func nutSlotStrip(_ L: FretboardLayout, bit: Double) -> SCNNode {
+            let x0 = L.xNut, x1 = L.xNut + bit
+            let steps = 40
+            var verts: [SCNVector3] = [], idx: [Int32] = []
+            var edges: [(SIMD3<Double>, SIMD3<Double>)] = []
+            func pt(_ x: Double, _ y: Double) -> SIMD3<Double> { SIMD3(x, y, L.topZ(x: x, y: y) + 0.12) }
+            let hw0 = L.taperHalfWidth(at: x0), hw1 = L.taperHalfWidth(at: x1)
+            for i in 0...steps {
+                let t = Double(i) / Double(steps)
+                let a = pt(x0, -hw0 + 2 * hw0 * t), b = pt(x1, -hw1 + 2 * hw1 * t)
+                verts.append(SCNVector3(a.x, a.y, a.z)); verts.append(SCNVector3(b.x, b.y, b.z))
+                if i > 0 {
+                    let n = Int32(verts.count - 4)
+                    idx += [n, n + 1, n + 2, n + 1, n + 3, n + 2]
+                    edges.append((pt(x0, -hw0 + 2 * hw0 * (t - 1 / Double(steps))), a))
+                    edges.append((pt(x1, -hw1 + 2 * hw1 * (t - 1 / Double(steps))), b))
+                }
+            }
+            edges.append((pt(x0, -hw0), pt(x1, -hw1))); edges.append((pt(x0, hw0), pt(x1, hw1)))
+            let geo = SCNGeometry(sources: [SCNGeometrySource(vertices: verts)],
+                                  elements: [SCNGeometryElement(indices: idx, primitiveType: .triangles)])
+            let m = SCNMaterial()
+            m.diffuse.contents = slotColor; m.lightingModel = .constant; m.isDoubleSided = true; m.transparency = 0.6
+            geo.materials = [m]
+            let node = SCNNode(geometry: geo)
+            node.addChildNode(lines(edges, color: slotColor))
+            return node
         }
 
         func rebuild(mesh: IndexedMesh, layout L: FretboardLayout) {
@@ -257,20 +303,6 @@ struct ModelViewer: NSViewRepresentable {
                          SIMD3(L.xNut, hwN, L.topZ(x: L.xNut, y: hwN) + 0.05)))
             fretNode.addChildNode(Self.lines(segs, color: NSColor(calibratedRed: 0.85, green: 0.85, blue: 0.9, alpha: 1)))
 
-            // Fender-style nut: mark the 0 fret and the fret -1 nut slot (4 mm past it) in amber.
-            if L.params.fenderNut {
-                var nutSegs: [(SIMD3<Double>, SIMD3<Double>)] = []
-                for x in [L.xNut, L.xNut - FretboardParameters.fenderSlotOffset] {
-                    let hw = L.taperHalfWidth(at: x)
-                    let steps = 40
-                    for s in 0..<steps {
-                        let y0 = -hw + 2 * hw * Double(s) / Double(steps)
-                        let y1 = -hw + 2 * hw * Double(s + 1) / Double(steps)
-                        nutSegs.append((SIMD3(x, y0, L.topZ(x: x, y: y0) + 0.1), SIMD3(x, y1, L.topZ(x: x, y: y1) + 0.1)))
-                    }
-                }
-                fretNode.addChildNode(Self.lines(nutSegs, color: NSColor(calibratedRed: 1.0, green: 0.72, blue: 0.2, alpha: 1)))
-            }
         }
 
         func addDimensions(_ L: FretboardLayout) {

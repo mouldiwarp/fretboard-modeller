@@ -24,6 +24,7 @@ struct ToolpathViewer: NSViewRepresentable {
     let version: Int
     let showRapids: Bool
     let showBoard: Bool
+    var showNutSlot = true
     let preset: ViewPreset
     let presetToken: Int
     let state: (index: Int, pos: SIMD3<Double>)?
@@ -74,6 +75,7 @@ struct ToolpathViewer: NSViewRepresentable {
             c.frame(preset: preset, layout: layout, T: toolpath.settings.stockThickness, focus: focus)
         }
         c.ghostNode.isHidden = !showBoard
+        c.slotNode.isHidden = !showNutSlot
         c.showRapids = showRapids
         if let s = state { c.update(index: s.index, pos: s.pos) }
     }
@@ -89,6 +91,8 @@ struct ToolpathViewer: NSViewRepresentable {
         let partialNode = SCNNode()
         let toolNode = SCNNode()
         let stockNode = SCNNode()
+        /// Always-visible highlight of the nut slot: its channel on the board and its whole toolpath.
+        let slotNode = SCNNode()
         let cameraNode = SCNNode()
         weak var view: ZoomSCNView?
         var builtVersion = -1
@@ -104,12 +108,12 @@ struct ToolpathViewer: NSViewRepresentable {
         var lastFrame: (ViewPreset, FretboardLayout, Double, (center: SIMD3<Double>, span: Double)?)?
 
         init() {
-            [stockNode, ghostNode, pendingNode, chunkRoot, partialNode, toolNode].forEach { modelNode.addChildNode($0) }
+            [stockNode, ghostNode, slotNode, pendingNode, chunkRoot, partialNode, toolNode].forEach { modelNode.addChildNode($0) }
         }
 
         func rebuild(toolpath tp: Toolpath, layout L: FretboardLayout, mesh: IndexedMesh) {
             let T = tp.settings.stockThickness
-            [ghostNode, pendingNode, chunkRoot, partialNode, toolNode, stockNode].forEach { n in
+            [ghostNode, slotNode, pendingNode, chunkRoot, partialNode, toolNode, stockNode].forEach { n in
                 n.childNodes.forEach { $0.removeFromParentNode() }
                 n.geometry = nil
             }
@@ -136,6 +140,15 @@ struct ToolpathViewer: NSViewRepresentable {
                 }
                 for (x, y) in [(x0, y0), (x1, y0), (x1, y1), (x0, y1)] { segs.append((SIMD3(x, y, 0), SIMD3(x, y, -T))) }
                 stockNode.addChildNode(ModelViewer.Coordinator.lines(segs, color: NSColor(white: 0.4, alpha: 1)))
+            }
+
+            // Nut slot: channel on the board and its toolpath, bright from the start so it can be checked before playback.
+            let slotCuts = (0..<tp.moves.count).filter { ops[$0] == .nutSlot && kinds[$0] == .cut }
+            if !slotCuts.isEmpty, L.params.fenderNut {
+                let strip = ModelViewer.Coordinator.nutSlotStrip(L, bit: tp.settings.nutSlot.bitDiameter)
+                strip.position = SCNVector3(0, 0, -T)
+                slotNode.addChildNode(strip)
+                slotNode.addChildNode(ModelViewer.Coordinator.lines(slotCuts.map { (from[$0], to[$0]) }, color: ModelViewer.Coordinator.slotColor))
             }
 
             // Dim preview of every cutting move.

@@ -73,7 +73,7 @@ struct ToolpathViewerInner: View {
         let layout = FretboardLayout(params)
         ZStack(alignment: .topLeading) {
             ToolpathViewer(toolpath: toolpath, layout: layout, mesh: MeshCache.mesh(for: params, layout: layout),
-                           version: tp.version, showRapids: showRapids, showBoard: showBoard,
+                           version: tp.version, showRapids: showRapids, showBoard: showBoard, showNutSlot: tp.showNutSlot,
                            preset: preset, presetToken: presetToken, state: tp.state(at: playback.time))
             HUD(playback: playback, toolpath: toolpath, state: { tp.state(at: $0) }).padding(10)
         }
@@ -330,6 +330,7 @@ struct SummaryPanel: View {
 // MARK: - Playback bar
 
 struct PlaybackBar: View {
+    @EnvironmentObject var tp: ToolpathStore
     let enabled: Bool
     @ObservedObject var playback: Playback
     @Binding var preset: ViewPreset
@@ -362,6 +363,9 @@ struct PlaybackBar: View {
                 }
                 LatchButton(title: "RAPIDS", on: showRapids, tint: Theme.steel) { showRapids.toggle() }.frame(width: 60)
                 LatchButton(title: "BOARD", on: showBoard, tint: Theme.steel) { showBoard.toggle() }.frame(width: 60)
+                if !tp.nutGcode.isEmpty {
+                    LatchButton(title: "NUT SLOT", on: tp.showNutSlot, tint: Color(nsColor: ModelViewer.Coordinator.slotColor)) { tp.showNutSlot.toggle() }.frame(width: 84)
+                }
             }
         }
         .padding(.horizontal, 14)

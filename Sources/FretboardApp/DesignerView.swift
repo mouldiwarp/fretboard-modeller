@@ -48,6 +48,7 @@ struct DesignerStatus: View {
 
 struct BottomBar: View {
     @EnvironmentObject var store: ModelStore
+    @EnvironmentObject var tp: ToolpathStore
     @Binding var preset: ViewPreset
     @Binding var presetToken: Int
     @Binding var showFrets: Bool
@@ -65,6 +66,9 @@ struct BottomBar: View {
             HStack(spacing: 4) {
                 LatchButton(title: "FRETS", on: showFrets, tint: Theme.haze) { showFrets.toggle() }.frame(width: 62)
                 LatchButton(title: "DIMENSIONS", on: showDimensions, tint: Theme.haze) { showDimensions.toggle() }.frame(width: 92)
+                if store.params.fenderNut {
+                    LatchButton(title: "NUT SLOT", on: tp.showNutSlot, tint: Color(nsColor: ModelViewer.Coordinator.slotColor)) { tp.showNutSlot.toggle() }.frame(width: 84)
+                }
             }
             Spacer()
             Text("Drag to orbit · ⌘ + scroll or pinch to zoom · click two points to measure")
@@ -83,6 +87,7 @@ struct BottomBar: View {
 
 struct ViewerPanel: View {
     @EnvironmentObject var store: ModelStore
+    @EnvironmentObject var tp: ToolpathStore
     @Binding var preset: ViewPreset
     @Binding var presetToken: Int
     @Binding var picks: [SIMD3<Double>]
@@ -98,6 +103,7 @@ struct ViewerPanel: View {
             presetToken: presetToken,
             showFrets: showFrets,
             showDimensions: showDimensions,
+            nutSlot: store.params.fenderNut && tp.showNutSlot ? tp.settings.nutSlot : nil,
             picks: $picks
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
