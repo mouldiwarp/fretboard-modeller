@@ -427,14 +427,15 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     // The channel runs from the zero fret to 4 mm beyond it: the bit centre sits 2 mm past the zero fret.
     let cuts = tp.moves.filter { $0.kind == .cut }
     #expect(cuts.allSatisfy { abs($0.to.x - (L.xNut + 2)) < 1e-9 })
-    // Floor: 3 mm below the board top on the centre line (Z0 = stock top); passes of at most 1 mm.
+    // Floor: 3 mm below the board top on the centre line (Z0 = stock top); very light 0.5 mm passes.
     let floor = p.thickness - s.stockThickness - 3
     #expect(abs(cuts.map(\.to.z).min()! - floor) < 1e-9)
     let levels = Set(cuts.map { ($0.to.z * 1000).rounded() })
-    #expect(levels.count == 3)
-    // Every Y end of a pass is beyond the board edge plus the bit radius, so the slot opens at both sides.
+    #expect(levels.count == 6)
+    // Every pass ends at least one bit width (4 mm) beyond the board edge, so the slot opens cleanly at both sides.
     let hw = L.taperHalfWidth(at: L.xNut)
-    #expect(cuts.allSatisfy { abs($0.to.y) >= hw + 2 + 0.4 })
+    #expect(cuts.allSatisfy { abs($0.to.y) >= hw + 4 - 1e-9 })
+    #expect(s.nutSlot.depthPerPass <= 0.5)
     // Never travels below safe height except by cutting moves (plunges are in the air beyond the board edge).
     #expect(tp.moves.filter { $0.kind == .rapid }.allSatisfy { $0.to.z >= s.safeZ - 1e-9 })
 
