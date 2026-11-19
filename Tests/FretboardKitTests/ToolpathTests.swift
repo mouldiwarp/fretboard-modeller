@@ -25,12 +25,13 @@ func job(_ truss: Bool = true, _ edit: (inout CNCSettings) -> Void = { _ in }) -
     var sawXY = false
     for m in t.moves {
         let d = m.to - p
-        if m.kind == .rapid { #expect(m.feed == 2500) }
+        if m.kind == .rapid { #expect(m.feed == t.settings.rapidFeed) }
         else {
-            #expect(m.feed <= 1000 + 1e-9)
-            if abs(d.x) + abs(d.y) < 1e-9 { #expect(m.feed == 800) }
-            if abs(d.z) > 1e-9 { #expect(m.feed * abs(d.z) / simd_length(d) <= 800 + 1e-6) } // Z speed
-            if abs(m.feed - 1000) < 1e-9 { sawXY = true }
+            let st = t.settings.stageFeed(m.op)
+            #expect(m.feed <= st.xy + 1e-9)
+            if abs(d.x) + abs(d.y) < 1e-9 { #expect(m.feed == st.z) }
+            if abs(d.z) > 1e-9 { #expect(m.feed * abs(d.z) / simd_length(d) <= st.z + 1e-6) } // Z speed
+            if abs(m.feed - st.xy) < 1e-9 { sawXY = true }
         }
         p = m.to
     }
@@ -129,18 +130,19 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     let lines = g.split(separator: "\n", omittingEmptySubsequences: true)
     #expect(g.contains("G21") && g.contains("G90"))
     #expect(lines.count > 500)
-    var maxF = 0.0, sawF1000 = false, sawF800 = false
+    var maxF = 0.0, sawRough = false, sawFinish = false
+    let fs = t.settings
     for line in lines where !line.hasPrefix(";") {
         let code = line.split(separator: ";")[0]
         #expect(code.hasPrefix("G") || code.hasPrefix("M"))
         if let r = code.range(of: " F") {
             let f = Double(code[r.upperBound...].split(separator: " ")[0])!
             maxF = max(maxF, f)
-            if f == 1000 { sawF1000 = true }
-            if f == 800 { sawF800 = true }
+            if f == fs.roughFeed.xy { sawRough = true }
+            if f == fs.finishFeed.xy { sawFinish = true }
         }
     }
-    #expect(maxF == 2500 && sawF1000 && sawF800)
+    #expect(maxF == fs.rapidFeed && sawRough && sawFinish)
     #expect(t.totalTime > 60)
 }
 
@@ -295,7 +297,7 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     #expect(abs(marks[12].distanceFromNut - 12.75 * 25.4) < 1e-9)
     #expect(abs(marks[24].distanceFromNut - 19.125 * 25.4) < 1e-9)
     #expect(abs(marks[1].distanceFromNut - 36.353) < 1e-3)
-    let g = FretTemplate.gcode(scaleLength: 25.5 * 25.4, marks: marks, settings: .init())
+    let g = FretTemplate.gcode(scaleLength: 25.5 * 25.4, marks: marks, settings: .init(), safeZ: 5)
     #expect(g.contains("G21\nG90\n") && g.hasSuffix("M30\n"))
     #expect(!g.contains("M3 ") && !g.contains("M5"))
     #expect(g.contains("(Fret 1)\nG0 Z5.000\nG0 X36.353 Y0.000\nG1 Z-6.000 F200.000"))
@@ -396,11 +398,11 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     p.hasSpokeWheelTrussRod = false
     var s = CNCSettings()
     s.select(.foxalien)
-    #expect(s.machine == .foxalien && s.spindleRPM == 18000 && s.rapidFeed == 5000)
+    #expect(s.machine == .foxalien && s.maxSpindleRPM == 24000 && s.rapidFeed == 5000 && s.roughFeed.xy <= s.maxCuttingFeed)
     let t = ToolpathGenerator.generate(layout: FretboardLayout(p), settings: s)
     let g = GCodeWriter.write(t, params: p)
     let lines = g.split(separator: "\n").map(String.init)
-    #expect(lines.contains("M3 S18000") && lines.contains("G4 P5") && lines.contains("G54") && lines.last == "M2")
+    #expect(lines.contains("M3 S24000") && lines.contains("G4 P5") && lines.contains("G54") && lines.last == "M2")
     #expect(!g.contains(";"))                                        // parenthesis comments only
     #expect(!lines.contains { $0.hasPrefix("G0") && $0.contains(" F") })   // GRBL rapids carry no F
     #expect(lines.contains { $0.hasPrefix("G1") && $0.contains(" F") })
@@ -409,7 +411,7 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
 
     // The WorkBee output is unchanged: semicolon comments, F on rapids, M3 with G4 P3000.
     let w = GCodeWriter.write(ToolpathGenerator.generate(layout: FretboardLayout(p), settings: {
-        var x = CNCSettings(); x.spindleRPM = 12000; return x }()), params: p)
+        var x = CNCSettings(); x.maxSpindleRPM = 24000; x.spindleRPM = 12000; return x }()), params: p)
     #expect(w.contains("G4 P3000") && w.contains("; ---- ") && w.contains("G0 Z5 F2500"))
 }
 
@@ -453,4 +455,75 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     var old = try JSONSerialization.jsonObject(with: ProjectFile().encoded()) as! [String: Any]
     var cnc = old["cnc"] as! [String: Any]; cnc.removeValue(forKey: "nutSlot"); old["cnc"] = cnc
     #expect(try ProjectFile.decode(JSONSerialization.data(withJSONObject: old)).cnc.nutSlot == NutSlotSettings())
+}
+
+@Suite struct FeedCalculatorTests {
+    @Test func calculatedFeedsHitTheHardwoodChipLoad() {
+        var c = CNCSettings(); c.select(.foxalien)
+        #expect(c.boardChecks.count == 3 && c.boardChecks.allSatisfy { $0.level == .ok })
+        #expect(c.roughFeed.z < c.roughFeed.xy)
+        #expect(c.finishFeed.xy <= c.roughFeed.xy)
+        #expect(c.roughDepthPerPass <= c.cutterDiameter * 0.5)
+        #expect(CNCSettings().boardChecks.allSatisfy { $0.level == .ok })   // out-of-the-box defaults are not flagged
+    }
+
+    @Test func rubbingAndOverloadAreFlagged() {
+        var c = CNCSettings(); c.select(.foxalien)
+        c.roughFeed.xy = 200
+        #expect(c.boardChecks.first?.level == .low)
+        #expect(c.boardChecks.first?.alert?.contains("heat") == true)
+        c.roughFeed.xy = 9000
+        #expect(c.boardChecks.first?.level == .high)
+        c.roughDepthPerPass = 4
+        #expect(!c.depthAlerts.isEmpty)
+    }
+
+    @Test func manualSpindleAssumesTheMachineSpeedAndWritesNoM3() throws {
+        let c = CNCSettings()   // manual spindle
+        #expect(c.boardChecks.first?.assumedRPM == true)
+        #expect(c.activeSpindleRPM == 0)
+        var f = CNCSettings(); f.select(.foxalien)
+        #expect(f.activeSpindleRPM == 24000)
+        f.spindleRPM = 30000
+        #expect(f.activeSpindleRPM == 24000)   // capped at the machine maximum
+    }
+
+    @Test func stagesUseTheirOwnFeeds() throws {
+        var c = CNCSettings(); c.select(.foxalien)
+        c.roughFeed = .init(xy: 3000, z: 700); c.finishFeed = .init(xy: 1500, z: 300); c.outlineFeed = .init(xy: 1200, z: 200)
+        let t = ToolpathGenerator.generate(layout: FretboardLayout(FretboardParameters()), settings: c)
+        func maxCut(_ op: CutOperation) -> Double { t.moves.filter { $0.op == op && $0.kind == .cut }.map(\.feed).max() ?? 0 }
+        #expect(maxCut(.roughSurface) == 3000)
+        #expect(maxCut(.finishSurface) == 1500)
+        #expect(maxCut(.finishOutline) == 1200)
+    }
+
+    @Test func nutSlotAndMarkerCutters() {
+        var c = CNCSettings(); c.select(.foxalien)
+        c.calculateNutSlotFeeds()
+        #expect(c.nutCheck?.level == .ok)
+        #expect(c.nutSlot.depthPerPass <= 0.5)
+        var i = InlayCutSettings(); i.calculateFeeds(c)
+        #expect(i.check(c)?.level == .ok)
+        var d = DotCutSettings(); d.calculateFeeds(c)
+        #expect(d.check(c)?.level == .ok)
+    }
+}
+
+@Test func spoilboardZeroShiftsEveryZ() {
+    var a = CNCSettings(), b = CNCSettings()
+    b.zZero = .spoilboard
+    let p = FretboardParameters()
+    let ga = GCodeWriter.write(ToolpathGenerator.generate(layout: FretboardLayout(p), settings: a), params: p)
+    let gb = GCodeWriter.write(ToolpathGenerator.generate(layout: FretboardLayout(p), settings: b), params: p)
+    func zs(_ g: String) -> [Double] {
+        g.split(separator: "\n").filter { !$0.hasPrefix(";") }.compactMap { l in
+            l.split(separator: " ").first { $0.hasPrefix("Z") }.flatMap { Double($0.dropFirst()) } }
+    }
+    let za = zs(ga), zb = zs(gb)
+    #expect(za.count == zb.count && !za.isEmpty)
+    #expect(zip(za, zb).allSatisfy { abs($1 - $0 - a.stockThickness) < 2e-3 })
+    #expect(zb.min()! >= -0.3 - 1e-9)       // lowest cut is at (or just into) the spoilboard
+    #expect(gb.contains("SPOILBOARD"))
+    a.zZero = .workpieceTop
 }

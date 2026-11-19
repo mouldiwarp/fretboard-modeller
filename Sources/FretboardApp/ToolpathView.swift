@@ -171,7 +171,7 @@ struct CNCSettingsPanel: View {
                 Text(String(format: "Nut end: %.1f mm of blank beyond the board. Blank is centred on the board.",
                             tp.settings.stockMaxX - FretboardLayout(store.params).xEnd))
                     .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
-                Text("Z0 is the top of the blank. The board bottom is the blank bottom.")
+                Text(tp.settings.zZero == .spoilboard ? "Z0 is the spoilboard surface. The board bottom is the blank bottom (Z0)." : "Z0 is the top of the blank. The board bottom is the blank bottom.")
                     .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
 
                 SectionLabel("Machine").padding(.top, 4)
@@ -183,22 +183,41 @@ struct CNCSettingsPanel: View {
                 Text("\(tp.settings.machine.controller) G-code. Choosing a machine loads its starting feeds and spindle speed; edit them below.")
                     .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
 
-                SectionLabel("Feeds").padding(.top, 4)
-                NumberField(title: "X/Y cutting", value: $tp.settings.xyFeed, unit: "mm/min")
-                NumberField(title: "Z cutting", value: $tp.settings.zFeed, unit: "mm/min")
+                SectionLabel("Machine limits").padding(.top, 4)
                 NumberField(title: "Fast travel", value: $tp.settings.rapidFeed, unit: "mm/min")
+                NumberField(title: "Max cutting feed", value: $tp.settings.maxCuttingFeed, unit: "mm/min")
+                NumberField(title: "Max spindle (0 = manual)", value: Binding(get: { Double(tp.settings.maxSpindleRPM) },
+                                                                              set: { tp.settings.maxSpindleRPM = max(0, Int($0)) }), unit: "rpm")
+                NumberField(title: "Safe Z above stock", value: $tp.settings.safeZ)
+                FieldCaption("Z zero (all toolpaths)")
+                HStack(spacing: 4) {
+                    ForEach(CNCSettings.ZZero.allCases) { z in
+                        LatchButton(title: z.title.uppercased(), on: tp.settings.zZero == z) { tp.settings.zZero = z }
+                    }
+                }
+
+                SectionLabel("Board cutter feeds").padding(.top, 4)
+                NumberField(title: "Spindle (0 = machine max)", value: Binding(get: { Double(tp.settings.spindleRPM) },
+                                                                               set: { tp.settings.spindleRPM = max(0, Int($0)) }), unit: "rpm")
+                LampStepper(title: "Cutter flutes", value: $tp.settings.cutterFlutes, range: 1...6)
+                LatchButton(title: "CALCULATE FEEDS (HARDWOOD)", on: false, height: 24) { tp.settings.calculateFeeds() }
+                FeedAdvice(checks: tp.settings.boardChecks, extra: tp.settings.depthAlerts)
 
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 VStack(alignment: .leading, spacing: 8) {
                 SectionLabel("Roughing")
                 NumberField(title: "Depth per pass", value: $tp.settings.roughDepthPerPass)
+                NumberField(title: "X/Y feed", value: $tp.settings.roughFeed.xy, unit: "mm/min")
+                NumberField(title: "Plunge feed", value: $tp.settings.roughFeed.z, unit: "mm/min")
                 NumberField(title: "Material left", value: $tp.settings.roughAllowance)
                 NumberField(title: "Surface overlap", value: pct($tp.settings.roughOverlap), unit: "%")
                 NumberField(title: "Trench width (× cutter)", value: $tp.settings.trenchWidthFactor, unit: "×")
 
                 SectionLabel("Finishing").padding(.top, 4)
                 NumberField(title: "Surface overlap", value: pct($tp.settings.finishOverlap), unit: "%")
+                NumberField(title: "X/Y feed", value: $tp.settings.finishFeed.xy, unit: "mm/min")
+                NumberField(title: "Plunge feed", value: $tp.settings.finishFeed.z, unit: "mm/min")
                 NumberField(title: "Cut into spoilboard", value: $tp.settings.throughCutExtra)
 
                 SectionLabel("Outline").padding(.top, 4)
@@ -206,18 +225,16 @@ struct CNCSettingsPanel: View {
                     LatchButton(title: "CLIMB (CCW)", on: tp.settings.climbOutline) { tp.settings.climbOutline = true }
                     LatchButton(title: "CONVENTIONAL (CW)", on: !tp.settings.climbOutline) { tp.settings.climbOutline = false }
                 }
+                NumberField(title: "X/Y feed", value: $tp.settings.outlineFeed.xy, unit: "mm/min")
+                NumberField(title: "Plunge feed", value: $tp.settings.outlineFeed.z, unit: "mm/min")
                 NumberField(title: "Tabs", value: Binding(get: { Double(tp.settings.tabCount) },
                                                            set: { tp.settings.tabCount = max(0, Int($0)) }), unit: "")
                 NumberField(title: "Tab width", value: $tp.settings.tabWidth)
                 NumberField(title: "Tab height", value: $tp.settings.tabHeight)
 
                 SectionLabel("Other").padding(.top, 4)
-                NumberField(title: "Safe Z above stock", value: $tp.settings.safeZ)
                 NumberField(title: "Edge margin", value: $tp.settings.edgeMargin)
                 NumberField(title: "Outline floor left", value: $tp.settings.outlineFloorAllowance)
-                NumberField(title: "Spindle (0 = manual)", value: Binding(get: { Double(tp.settings.spindleRPM) },
-                                                                          set: { tp.settings.spindleRPM = max(0, Int($0)) }),
-                            unit: "rpm")
 
                 if store.params.fenderNut {
                     SectionLabel("Nut slot (own bit & file)").padding(.top, 4)
@@ -226,6 +243,9 @@ struct CNCSettingsPanel: View {
                     NumberField(title: "Depth per pass", value: $tp.settings.nutSlot.depthPerPass)
                     NumberField(title: "Slot feed", value: $tp.settings.nutSlot.feed, unit: "mm/min")
                     NumberField(title: "Slot plunge", value: $tp.settings.nutSlot.plungeFeed, unit: "mm/min")
+                    LampStepper(title: "Bit flutes", value: $tp.settings.nutSlot.flutes, range: 1...6)
+                    LatchButton(title: "CALCULATE SLOT FEEDS", on: false, height: 24) { tp.settings.calculateNutSlotFeeds() }
+                    FeedAdvice(check: tp.settings.nutCheck)
                     NumberField(title: "Spindle (0 = as board)", value: Binding(get: { Double(tp.settings.nutSlot.spindleRPM) },
                                                                                set: { tp.settings.nutSlot.spindleRPM = max(0, Int($0)) }),
                                 unit: "rpm")

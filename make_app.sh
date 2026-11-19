@@ -4,10 +4,19 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 DEST="${1:-$HOME/Applications}"
+# Release builds: SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" signs with the hardened runtime and a
+# secure timestamp, which notarization requires. UNIVERSAL=1 builds for Apple Silicon and Intel. BUNDLE_ID overrides
+# the bundle identifier. With none of these set it makes an ad-hoc signed, single-architecture local build.
+SIGN="${SIGN_IDENTITY:--}"
+BUNDLE_ID="${BUNDLE_ID:-local.fretboard.modeller}"
+VERSION="${VERSION:-1.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-1}"
 APP="$DEST/Fretboard Modeller.app"
 
-swift build -c release
-BIN="$(swift build -c release --show-bin-path)/FretboardApp"
+ARCH_FLAGS=()
+[ "${UNIVERSAL:-0}" = 1 ] && ARCH_FLAGS=(--arch arm64 --arch x86_64)
+swift build -c release "${ARCH_FLAGS[@]}"
+BIN="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)/FretboardApp"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -22,12 +31,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0"><dict>
   <key>CFBundleName</key><string>Fretboard Modeller</string>
   <key>CFBundleDisplayName</key><string>Fretboard Modeller</string>
-  <key>CFBundleIdentifier</key><string>local.fretboard.modeller</string>
+  <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleExecutable</key><string>FretboardApp</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+  <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.graphics-design</string>
   <key>NSHighResolutionCapable</key><true/>
@@ -47,7 +56,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   </dict></array>
 </dict></plist>
 PLIST
-codesign --force --sign - "$APP"
+if [ "$SIGN" = "-" ]; then
+  codesign --force --sign - "$APP"
+else
+  codesign --force --options runtime --timestamp --sign "$SIGN" "$APP"
+  codesign --verify --strict --verbose=2 "$APP"
+fi
 touch "$APP"
 mdimport "$APP" 2>/dev/null || true
 echo "Installed: $APP"

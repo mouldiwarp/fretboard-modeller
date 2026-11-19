@@ -398,8 +398,8 @@ struct MarkerJobsPanel: View {
                     Label(e, systemImage: "exclamationmark.triangle.fill")
                         .font(Theme.heading(10.5)).foregroundStyle(Theme.danger)
                 }
-                Text(String(format: "Board-origin jobs use the board job's zero: X0 heel edge, Y0 centre line, Z0 top of the %.1f mm blank (set in the Toolpath tab). Run them after surfacing, before releasing the board from its tabs.",
-                            tp.settings.stockThickness))
+                Text(String(format: "Board-origin jobs use the board job's zero: X0 heel edge, Y0 centre line, Z0 %@ (%.1f mm blank; set in the Toolpath tab). Run them after surfacing, before releasing the board from its tabs.",
+                            tp.settings.zZeroName.lowercased(), tp.settings.stockThickness))
                     .font(Theme.heading(10)).foregroundStyle(Theme.dim)
 
                 if store.markers.mode.hasDots {
@@ -408,7 +408,10 @@ struct MarkerJobsPanel: View {
                     NumberField(title: "Peck depth", value: $mk.dots.peckDepth)
                     NumberField(title: "Plunge feed", value: $mk.dots.plungeFeed, unit: "mm/min")
                     NumberField(title: "X/Y feed", value: $mk.dots.xyFeed, unit: "mm/min")
-                    NumberField(title: "Spindle (0 = manual)", value: dbl($mk.dots.spindleRPM), unit: "rpm")
+                    NumberField(title: "Spindle (0 = machine max)", value: dbl($mk.dots.spindleRPM), unit: "rpm")
+                    LampStepper(title: "Flutes", value: $mk.dots.flutes, range: 1...6)
+                    LatchButton(title: "CALCULATE FEEDS (HARDWOOD)", on: false, height: 24) { mk.dots.calculateFeeds(tp.settings) }
+                    FeedAdvice(check: mk.dots.check(tp.settings))
                     ForEach(MarkerToolpath.validate(dots: mk.dots, markers: store.markers), id: \.self) {
                         Text($0).font(Theme.heading(10.5)).foregroundStyle(Theme.danger)
                     }
@@ -446,7 +449,10 @@ struct MarkerJobsPanel: View {
                     NumberField(title: "Ramp angle", value: $mk.inlay.rampAngle, unit: "°")
                     NumberField(title: "Finish allowance", value: $mk.inlay.wallAllowance)
                     NumberField(title: "Planning resolution", value: $mk.inlay.resolution)
-                    NumberField(title: "Spindle (0 = manual)", value: dbl($mk.inlay.spindleRPM), unit: "rpm")
+                    NumberField(title: "Spindle (0 = machine max)", value: dbl($mk.inlay.spindleRPM), unit: "rpm")
+                    LampStepper(title: "Flutes", value: $mk.inlay.flutes, range: 1...6)
+                    LatchButton(title: "CALCULATE FEEDS (HARDWOOD)", on: false, height: 24) { mk.inlay.calculateFeeds(tp.settings) }
+                    FeedAdvice(check: mk.inlay.check(tp.settings))
                     HStack(spacing: 4) {
                         LatchButton(title: "CLIMB", on: mk.inlay.climb) { mk.inlay.climb = true }
                         LatchButton(title: "CONVENTIONAL", on: !mk.inlay.climb) { mk.inlay.climb = false }

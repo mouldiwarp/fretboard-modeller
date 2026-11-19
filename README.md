@@ -24,7 +24,7 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
 - **Modes:** none, dots, dots + 12th-fret inlay (the inlay replaces the 12th double dot), or the inlay only.
 - **Dots:** 6 mm × 3 mm by default, in the middle of the chosen fret spaces (3, 5, 7, 9, 12, 15, 17, 19, 21, 24), with a flat floor 3 mm below the surface at the dot centre. The 12th (and 24th) are double dots under the **B and A strings**. String positions run straight from the nut (outer E strings 3 mm in from the edges) to a Les Paul tune-o-matic (52.4 mm E to E) with **compensated spacing** (equal gaps between the strings' edges, from the gauges). Because the bass strings are heavier, the pair sits slightly toward the treble side (0.75 mm with .010–.046).
 - **Orientation:** the board is right-handed by default, with the bass side at +Y. The Markers plan shows it the same way round as the Designer's top view (heel on the left, nut on the right, bass side at the top), and the inlay reads upright in that view. Tick *Left-handed board* to mirror the string layout; the plan and the inlay then turn half a turn.
-- **Inlay:** choosing a mode with a 12th-fret inlay starts from the bundled default design (`Assets/default-inlay.png`), 45 mm tall across the board. To use your own, import a black-and-white image (PNG, JPEG, PDF, …), paste one, drag one in, or **Capture** an area of the screen from a design app. Black becomes the pocket; holes and islands are kept. Threshold, invert and smoothing adjust the trace. Size it freely or with the aspect ratio locked, move it, rotate it or mirror it. It is centred on the 12th fret space and may span the 11th to 13th; the app warns which fret slots will cross it. The pocket floor follows the board radius, 3 mm deep everywhere.
+- **Inlay:** choosing a mode with a 12th-fret inlay starts from the bundled default design (`Assets/default-inlay.png`), 58 mm tall across the board. To use your own, import a black-and-white image (PNG, JPEG, PDF, …), paste one, drag one in, or **Capture** an area of the screen from a design app. Black becomes the pocket; holes and islands are kept. Threshold, invert and smoothing adjust the trace. Size it freely or with the aspect ratio locked, move it, rotate it or mirror it. It is centred on the 12th fret space and may span the 11th to 13th; the app warns which fret slots will cross it. The pocket floor follows the board radius, 3 mm deep everywhere.
 - The pockets are cut into the Designer model and the STL (the mesh stays watertight). The inlay pocket is the shape the inlay cutter actually cuts: tips and strokes narrower than the cutter are left standing, and inside corners keep the cutter's radius, so the STL matches the machined board.
 - **G-code** (two separate files):
   - *Dots* – the 6 mm cutter, peck-drilled (or spiralled out if a dot is wider than the cutter), using the board job's origin (X0 heel edge, Y0 centre line, Z0 top of the blank, blank thickness from the Toolpath tab). Run it after surfacing, while the board is still held by its tabs.
@@ -40,12 +40,14 @@ A full illustrated walk-through is in [`docs/Fretboard-Modeller-User-Guide.pdf`]
 - Generated toolpaths aren't saved; press GENERATE again after opening. Files from older versions open with defaults for anything they lack; files from a newer version are refused.
 
 ## Toolpath (CNC)
+**Feed calculator:** every cutter section (board cutter, nut slot, dots, inlay) on the Defaults page has a flutes setting and a **CALCULATE FEEDS (HARDWOOD)** button. It sets the X/Y and plunge feeds (and, for the board cutter and nut slot, the depth per pass) from feed = chip load × flutes × spindle speed, with a chip load of 0.014 × cutter diameter, capped at the machine's cutting speed. With the spindle on manual (0 rpm) it assumes the machine's typical speed and says so. The same fields and button are on the Toolpath and Markers pages, where you can override the values. A **red warning** appears whenever the chip load falls below half the target (rubbing: heat, burning, a dull cutter) or above 1.5 times it (overload: deflection, heat, breakage), and when roughing passes are deeper than half the cutter diameter.
+
 **Fender-style nut:** the Toolpath tab adds a second job that machines the nut channel at the zero fret: a flat-bottomed slot, the width of the bit (default 4 mm compression bit), running from the 0 fret toward the end of the board, 3 mm deep by default, in very light 0.5 mm passes that run at least one bit width past each board edge (to avoid lips and splits). It runs across the full board width and out into the cleared trench at both ends, so run it **after the board job and a tool change**, with Z re-probed on the top of the blank. The result is two G-code files: `…_1_board.nc` and `…_2_nut_slot.nc` (EXPORT 2 FILES, or SEND to KerfLine as one group in run order). The preview and run time include both. Slot settings are in the Toolpath tab and the Defaults page. A **NUT SLOT** button (Designer bottom bar and Toolpath playback bar, Fender only) shows or hides a salmon highlight of the channel on the board and, in the Toolpath view, the slot's whole toolpath from the start, before playback reaches it.
 
 The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 1000× with a moving cutter and live X/Y/Z/feed readout.
 
-- **G-code dialects:** choose in the Toolpath tab (or set the default on the Defaults page). *Duet / RepRapFirmware* (tested on the Ooznest WorkBee Z1+): semicolon comments. *GRBL* (any GRBL machine, USB sender or offline controller; tested on the FoxAlien XE-Pro Ultra with a VFD spindle): `G94`/`G54` header, `M3 S<rpm>` then a 5 s `G4` spin-up, `(parenthesis)` comments on their own lines, no `F` on rapids, ends `M5` / `M2`. Choosing a dialect loads starting feeds and spindle speed (GRBL: 2000 / 800 / 5000 mm/min, 18000 rpm), all editable. Work origin: X0 = heel edge of the board, Y0 = board centre line, Z0 = top of the blank. Cutter: 6 mm flat end mill.
-- **Feeds:** X/Y cutting 1000 mm/min, Z cutting 800 mm/min, fast travel configurable (default 2500 mm/min is a placeholder – set it to your machine's maximum).
+- **G-code dialects:** choose in the Toolpath tab (or set the default on the Defaults page). *Duet / RepRapFirmware* (tested on the Ooznest WorkBee Z1+): semicolon comments. *GRBL* (any GRBL machine, USB sender or offline controller; tested on the FoxAlien XE-Pro Ultra with a VFD spindle): `G94`/`G54` header, `M3 S<rpm>` then a 5 s `G4` spin-up, `(parenthesis)` comments on their own lines, no `F` on rapids, ends `M5` / `M2`. Choosing a dialect loads its machine limits (GRBL preset: 5000 mm/min fast travel and max feed, 24000 rpm max spindle) and recalculates the feeds, all editable. Work origin: X0 = heel edge of the board, Y0 = board centre line, Z0 = top of the blank. Cutter: 6 mm flat end mill.
+- **Feeds and machine limits:** cutting feeds are per cutter and cut stage (roughing, finishing, outline, nut slot, dots, inlay), calculated from chip load or entered by hand. The Machine card holds what is shared: preset (G-code dialect), fast travel, max cutting feed, max spindle speed (0 = manual spindle, no M3/M5) and safe Z, plus **Z zero**: the workpiece top or the spoilboard surface, applied to every board-origin job.
 - **Blank:** set the blank length, width, thickness and where the board sits in it before generating. The blank thickness is a *minimum*: it must be at least board thickness + material left + 0.5 mm so there is always a roughing pass. The path is clipped to the blank and checked against it.
 - **Sequence** (all aimed at reducing splitting):
   1. Rough the top surface – passes across the board width, extending past the edges, 1.5 mm deep, leaving 0.5 mm, 20 % overlap.
@@ -59,7 +61,7 @@ The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 10
 ![Toolpath](docs/img/toolpath.png)
 
 ## Fret Template
-Ported from the standalone Fret Template Builder. Computes fret positions from the nut (`d = L·(1 − 1/2^(n/12))`) and writes GRBL-style G-code that drills marker holes on the centre line (Y0) at each fret (fret 0 = X0). The Fender nut channel is not marked here: with a Fender-style nut the Toolpath tab machines it (see below). Defaults: 4 mm hole (documentation only), 6 mm plunge, 5 mm safe Z, 200 mm/min. No spindle commands – run the drill by hand. Scale length and fret count start from the designer's values.
+Ported from the standalone Fret Template Builder. Computes fret positions from the nut (`d = L·(1 − 1/2^(n/12))`) and writes GRBL-style G-code that drills marker holes on the centre line (Y0) at each fret (fret 0 = X0). The Fender nut channel is not marked here: with a Fender-style nut the Toolpath tab machines it (see below). Defaults: 6 mm plunge, 200 mm/min (safe Z comes from the machine limits). No spindle commands – run the drill by hand. Scale length and fret count start from the designer's values.
 
 ![Fret Template](docs/img/template.png)
 
@@ -72,6 +74,17 @@ swift run FretboardApp          # run from the command line
 ./make_app.sh                   # build "Fretboard Modeller.app" into ~/Applications (Spotlight-launchable)
 ```
 Requires macOS 13+ and a Swift 5.9+ toolchain (Command Line Tools are enough).
+
+## Releasing (signed and notarized)
+
+`./make_app.sh` makes an ad-hoc signed local build. For a public release, with an Apple Developer ID certificate:
+
+```sh
+xcrun notarytool store-credentials "gm-notary" --apple-id YOU@EXAMPLE.COM --team-id TEAMID --password APP-SPECIFIC-PASSWORD   # once
+SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" BUNDLE_ID=com.example.fretboardmodeller ./scripts/release.sh 1.1
+```
+
+`scripts/release.sh` runs the tests, builds a universal (Apple Silicon + Intel) app signed with the hardened runtime, submits it to Apple's notary service, staples the ticket, checks it with Gatekeeper and writes `release/Fretboard-Modeller-<version>.zip` with a SHA-256 file. `./scripts/make-guide.sh` regenerates the PDF guide from `docs/guide.html` using headless Chrome.
 
 ## Tests
 ```sh

@@ -15,12 +15,31 @@ final class ProjectController: ObservableObject {
     let markers = MarkerStore()
     @Published private(set) var url: URL?
     @Published private(set) var saved: ProjectFile
+    /// Recently opened or saved projects, newest first (files that no longer exist are dropped).
+    @Published private(set) var recents: [URL] = []
+
+    func refreshRecents() {
+        recents = NSDocumentController.shared.recentDocumentURLs.filter {
+            $0.pathExtension == ProjectFile.fileExtension && FileManager.default.fileExists(atPath: $0.path)
+        }
+    }
+
+    func clearRecents() {
+        NSDocumentController.shared.clearRecentDocuments(nil)
+        refreshRecents()
+    }
+
+    private func noteRecent(_ u: URL) {
+        NSDocumentController.shared.noteNewRecentDocumentURL(u)
+        refreshRecents()
+    }
 
     init() {
         markers.model = model
         saved = ProjectFile()
         apply(AppDefaults.shared.template)
         saved = snapshot()
+        refreshRecents()
     }
 
     var title: String { url?.deletingPathExtension().lastPathComponent ?? "Untitled" }
@@ -67,7 +86,11 @@ final class ProjectController: ObservableObject {
         guard confirmDiscard(action: "opening another project") else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.fretboardProject, .json]
-        guard panel.runModal() == .OK, let u = panel.url else { return }
+        // A "Recent files" pop-up in the dialog: picking one opens it straight away.
+        var chosen: URL?
+        let picker = RecentPicker(urls: recents) { u in chosen = u; NSApp.stopModal(withCode: .OK) }
+        if !recents.isEmpty { panel.accessoryView = picker.view; panel.isAccessoryViewDisclosed = true }
+        guard panel.runModal() == .OK, let u = chosen ?? panel.url else { return }
         load(u)
     }
 
@@ -83,7 +106,7 @@ final class ProjectController: ObservableObject {
             apply(p)
             url = u
             saved = snapshot()
-            NSDocumentController.shared.noteNewRecentDocumentURL(u)
+            noteRecent(u)
         } catch {
             alert("Could not open \(u.lastPathComponent)", error)
         }
@@ -110,7 +133,7 @@ final class ProjectController: ObservableObject {
         do {
             try p.encoded().write(to: u, options: .atomic)
             url = u; saved = p
-            NSDocumentController.shared.noteNewRecentDocumentURL(u)
+            noteRecent(u)
             return true
         } catch {
             alert("Could not save \(u.lastPathComponent)", error)
@@ -139,5 +162,35 @@ final class ProjectController: ObservableObject {
         a.messageText = title
         a.informativeText = error.localizedDescription
         a.runModal()
+    }
+}
+
+/// The "Recent files" pop-up shown in the Open dialog.
+@MainActor
+final class RecentPicker: NSObject {
+    let view: NSView
+    private let urls: [URL]
+    private let onPick: (URL) -> Void
+    private let popup = NSPopUpButton(frame: .zero, pullsDown: true)
+
+    init(urls: [URL], onPick: @escaping (URL) -> Void) {
+        self.urls = urls; self.onPick = onPick
+        let label = NSTextField(labelWithString: "Recent files:")
+        popup.addItem(withTitle: "Choose a recent file…")
+        for u in urls {
+            let dir = u.deletingLastPathComponent().lastPathComponent
+            popup.addItem(withTitle: "\(u.deletingPathExtension().lastPathComponent)  —  \(dir)")
+        }
+        let stack = NSStackView(views: [label, popup])
+        stack.orientation = .horizontal; stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        view = stack
+        super.init()
+        popup.target = self; popup.action = #selector(picked(_:))
+    }
+
+    @objc private func picked(_ s: NSPopUpButton) {
+        let i = s.indexOfSelectedItem - 1
+        if urls.indices.contains(i) { onPick(urls[i]) }
     }
 }

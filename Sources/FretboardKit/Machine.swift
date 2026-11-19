@@ -32,26 +32,32 @@ public enum Machine: String, CaseIterable, Codable, Sendable, Identifiable {
     /// Seconds to wait after M3 for the spindle to reach speed. A 1.5 kW VFD spindle takes a few seconds.
     public var spinUpSeconds: Int { self == .foxalien ? 5 : 3 }
 
-    /// Starting values applied when this machine is chosen. The user can change every one of them afterwards.
+    /// Machine limits loaded when this preset is chosen. Cutting feeds are not machine settings: each cutter and
+    /// cut stage gets its own, calculated from chip load within these limits.
     public struct Defaults: Equatable, Sendable {
-        public var xyFeed: Double, zFeed: Double, rapidFeed: Double, spindleRPM: Int
+        public var rapidFeed: Double, maxCuttingFeed: Double, maxSpindleRPM: Int
     }
 
     public var defaults: Defaults {
         switch self {
-        case .workbee: Defaults(xyFeed: 1000, zFeed: 800, rapidFeed: 2500, spindleRPM: 0)
-        // Linear rails, stiffer steppers and a VFD spindle allow more than the WorkBee. These are conservative
-        // starting points for a 6 mm flat end mill in hardwood; the spindle runs 6000-24000 rpm.
-        case .foxalien: Defaults(xyFeed: 2000, zFeed: 800, rapidFeed: 5000, spindleRPM: 18000)
+        // Router on a manual speed dial: no spindle commands (max spindle 0).
+        case .workbee: Defaults(rapidFeed: 2500, maxCuttingFeed: 2500, maxSpindleRPM: 0)
+        // Linear rails and stiffer steppers; the 1.5 kW VFD spindle runs 6000-24000 rpm.
+        case .foxalien: Defaults(rapidFeed: 5000, maxCuttingFeed: 5000, maxSpindleRPM: 24000)
         }
     }
+
+    /// Spindle speed assumed for feed calculations when the spindle is controlled by hand.
+    public var typicalRPM: Int { self == .foxalien ? 18000 : 16000 }
 }
 
 extension CNCSettings {
-    /// Switches machine and loads that machine's feeds and spindle speed.
+    /// Switches machine preset: loads its dialect and limits, then recalculates every cutter's feeds within them.
     public mutating func select(_ m: Machine) {
         machine = m
         let d = m.defaults
-        xyFeed = d.xyFeed; zFeed = d.zFeed; rapidFeed = d.rapidFeed; spindleRPM = d.spindleRPM
+        rapidFeed = d.rapidFeed; maxCuttingFeed = d.maxCuttingFeed; maxSpindleRPM = d.maxSpindleRPM
+        calculateFeeds()
+        calculateNutSlotFeeds()
     }
 }

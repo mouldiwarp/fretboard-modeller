@@ -5,6 +5,7 @@ import simd
 public struct NutSlotSettings: Equatable, Codable, Sendable {
     /// Bit diameter = channel width. The channel runs from the zero fret toward the end of the board.
     public var bitDiameter = 4.0
+    public var flutes = 2
     /// Channel depth below the top of the board on its centre line (the floor is flat).
     public var depth = 3.0
     /// Light passes leave a clean edge and avoid lips and splits where the bit exits the board sides.
@@ -13,6 +14,7 @@ public struct NutSlotSettings: Equatable, Codable, Sendable {
     public var feed = 1200.0
     public var plungeFeed = 400.0
     /// 0 = the same spindle speed as the board job.
+    /// 0 = the same speed as the board cutter.
     public var spindleRPM = 0
     public init() {}
 }
@@ -96,12 +98,12 @@ public enum NutSlotToolpath {
         mv.retract(safeZ, op)
         mv.rapid(SIMD3(0, 0, safeZ), op)
 
-        let ms = MarkerToolpath.machineSettings(cnc, cutter: n.bitDiameter, xy: n.feed, z: n.plungeFeed, safeZ: safeZ,
+        let ms = MarkerToolpath.machineSettings(cnc, cutter: n.bitDiameter,
                                                 rpm: n.spindleRPM > 0 ? n.spindleRPM : cnc.spindleRPM)
         let tp = Toolpath(start: SIMD3(0, 0, safeZ), moves: mv.moves, settings: ms)
         var h: [String] = []
         h.append("; Fretboard Modeller - Fender nut slot - \(cnc.machine.title)")
-        h.append("; TOOL CHANGE: fit the \(String(format: "%.1f", n.bitDiameter)) mm compression bit. Same X/Y zero as the board job; re-probe Z0 on the top of the stock.")
+        h.append("; TOOL CHANGE: fit the \(String(format: "%.1f", n.bitDiameter)) mm compression bit. Same X/Y zero as the board job; re-probe Z0 (\(cnc.zZeroName)).")
         h.append("; Run AFTER the board job so the bit runs out into the cleared trench at both ends.")
         h.append(String(format: "; Channel: X%.3f to X%.3f (zero fret to %.1f mm beyond), bit centre runs to Y -%.1f / +%.1f (at least one bit width past the board edge), floor Z%.3f (%.2f mm below the board top on the centre line)",
                         L.xNut, L.xNut + n.bitDiameter, n.bitDiameter, yEnd, yEnd, floor, n.depth))

@@ -6,13 +6,14 @@ import FretboardKit
 /// The fret-slot jig template tool: marker-hole G-code for locating fret slots on a chop saw jig.
 struct FretTemplateView: View {
     @EnvironmentObject var store: ModelStore
+    @EnvironmentObject var tp: ToolpathStore
     @State private var scaleLength = AppDefaults.shared.template.params.scaleLength
     @State private var fretCount = AppDefaults.shared.template.params.fretCount
     @State private var settings = AppDefaults.shared.file.fretTemplate
     @State private var synced = false
 
     private var marks: [FretMark] { FretTemplate.positions(scaleLength: scaleLength, fretCount: fretCount) }
-    private var gcode: String { FretTemplate.gcode(scaleLength: scaleLength, marks: marks, settings: settings) }
+    private var gcode: String { FretTemplate.gcode(scaleLength: scaleLength, marks: marks, settings: settings, safeZ: tp.settings.safeZ) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,15 +40,13 @@ struct FretTemplateView: View {
             LampStepper(title: "Frets", value: $fretCount, range: 1...36)
             LatchButton(title: "USE DESIGNER VALUES", on: false, height: 22) { syncFromDesigner() }
             SectionLabel("Marker holes").padding(.top, 4)
-            NumberField(title: "Hole diameter", value: $settings.holeDiameter)
             NumberField(title: "Plunge depth", value: $settings.plungeDepth)
-            NumberField(title: "Safe Z", value: $settings.safeZ)
             NumberField(title: "Feed", value: $settings.feed, unit: "mm/min")
             HStack(spacing: 4) {
                 LatchButton(title: "( COMMENTS )", on: settings.commentStyle == .parentheses) { settings.commentStyle = .parentheses }
                 LatchButton(title: "; COMMENTS", on: settings.commentStyle == .semicolon) { settings.commentStyle = .semicolon }
             }
-            Text("Fret 0 (the nut) is X0; holes run along Y0. No spindle commands, so run the drill by hand. Hole diameter is documentation only.")
+            Text("Fret 0 (the nut) is X0; holes run along Y0. No spindle commands, so run the drill by hand.")
                 .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
             Spacer(minLength: 0)
             HStack(spacing: 8) {

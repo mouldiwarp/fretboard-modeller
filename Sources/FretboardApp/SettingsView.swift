@@ -20,7 +20,8 @@ struct SettingsView: View {
                     card("Board") { board }
                     card("Truss rod & cutout") { cutout }
                     card("Blank (stock)") { blank }
-                    card("Cutter & feeds") { cutter }
+                    card("Machine") { cutter }
+                    card("Board cutter") { boardCutter }
                     card("Roughing & finishing") { passes }
                     card("Outline, tabs & accuracy") { outline }
                     card("Fret dots") { dots }
@@ -116,6 +117,10 @@ struct SettingsView: View {
             num("Slot feed", P.appending(path: \.cnc.nutSlot.feed), "mm/min")
             num("Slot plunge feed", P.appending(path: \.cnc.nutSlot.plungeFeed), "mm/min")
             rpm("Spindle speed (0 = as board)", P.appending(path: \.cnc.nutSlot.spindleRPM))
+            FeedCalculatorRow(flutes: Binding(get: { defaults.file.project.cnc.nutSlot.flutes }, set: { defaults.file.project.cnc.nutSlot.flutes = $0 })) {
+                defaults.file.project.cnc.calculateNutSlotFeeds()
+            }
+            FeedAdvice(check: defaults.file.project.cnc.nutCheck)
         }
     }
 
@@ -148,18 +153,39 @@ struct SettingsView: View {
                     }
                 }
             }
-            num("Cutter diameter", P.appending(path: \.cnc.cutterDiameter))
-            num("X/Y feed", P.appending(path: \.cnc.xyFeed), "mm/min")
-            num("Z feed", P.appending(path: \.cnc.zFeed), "mm/min")
             num("Rapid feed", P.appending(path: \.cnc.rapidFeed), "mm/min")
+            num("Max cutting feed", P.appending(path: \.cnc.maxCuttingFeed), "mm/min")
+            rpm("Max spindle speed (0 = manual)", P.appending(path: \.cnc.maxSpindleRPM))
             num("Safe Z", P.appending(path: \.cnc.safeZ))
-            rpm("Spindle speed (0 = off)", P.appending(path: \.cnc.spindleRPM))
+            FieldCaption("Z zero (all toolpaths)")
+            HStack(spacing: 4) {
+                ForEach(CNCSettings.ZZero.allCases) { z in
+                    LatchButton(title: z.title.uppercased(), on: defaults.file.project.cnc.zZero == z) { defaults.file.project.cnc.zZero = z }
+                }
+            }
+            Text("Machine limits shared by every job. Each cutter and cut stage has its own feeds, calculated from chip load within these limits. Choosing a preset loads its limits and recalculates the feeds.")
+                .font(.system(size: 10)).foregroundStyle(Theme.dim).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var boardCutter: some View {
+        Group {
+            num("Cutter diameter", P.appending(path: \.cnc.cutterDiameter))
+            rpm("Spindle speed (0 = machine max)", P.appending(path: \.cnc.spindleRPM))
+            FeedCalculatorRow(flutes: Binding(get: { defaults.file.project.cnc.cutterFlutes }, set: { defaults.file.project.cnc.cutterFlutes = $0 })) {
+                defaults.file.project.cnc.calculateFeeds()
+            }
+            FeedAdvice(checks: defaults.file.project.cnc.boardChecks, extra: defaults.file.project.cnc.depthAlerts)
         }
     }
 
     private var passes: some View {
         Group {
             num("Roughing depth per pass", P.appending(path: \.cnc.roughDepthPerPass))
+            num("Roughing X/Y feed", P.appending(path: \.cnc.roughFeed.xy), "mm/min")
+            num("Roughing plunge feed", P.appending(path: \.cnc.roughFeed.z), "mm/min")
+            num("Finishing X/Y feed", P.appending(path: \.cnc.finishFeed.xy), "mm/min")
+            num("Finishing plunge feed", P.appending(path: \.cnc.finishFeed.z), "mm/min")
             num("Material left by roughing", P.appending(path: \.cnc.roughAllowance))
             num("Roughing overlap", P.appending(path: \.cnc.roughOverlap), "%", scale: 100)
             num("Finishing overlap", P.appending(path: \.cnc.finishOverlap), "%", scale: 100)
@@ -172,6 +198,8 @@ struct SettingsView: View {
 
     private var outline: some View {
         Group {
+            num("Outline X/Y feed", P.appending(path: \.cnc.outlineFeed.xy), "mm/min")
+            num("Outline plunge feed", P.appending(path: \.cnc.outlineFeed.z), "mm/min")
             flag("Climb milling (counter-clockwise)", P.appending(path: \.cnc.climbOutline))
             count("Tabs", P.appending(path: \.cnc.tabCount), 0...12)
             num("Tab width", P.appending(path: \.cnc.tabWidth))
@@ -199,8 +227,11 @@ struct SettingsView: View {
             num("Plunge feed", P.appending(path: \.dots.plungeFeed), "mm/min")
             num("X/Y feed", P.appending(path: \.dots.xyFeed), "mm/min")
             num("Stepover", P.appending(path: \.dots.stepover), "%", scale: 100)
-            num("Safe Z", P.appending(path: \.dots.safeZ))
-            rpm("Spindle speed (0 = off)", P.appending(path: \.dots.spindleRPM))
+            rpm("Spindle speed (0 = machine max)", P.appending(path: \.dots.spindleRPM))
+            FeedCalculatorRow(flutes: Binding(get: { defaults.file.project.dots.flutes }, set: { defaults.file.project.dots.flutes = $0 })) {
+                defaults.file.project.dots.calculateFeeds(defaults.file.project.cnc)
+            }
+            FeedAdvice(check: defaults.file.project.dots.check(defaults.file.project.cnc))
         }
     }
 
@@ -230,8 +261,11 @@ struct SettingsView: View {
             num("Wall allowance", P.appending(path: \.inlay.wallAllowance))
             num("Slot feed", P.appending(path: \.inlay.slotFeedFactor), "%", scale: 100)
             num("Planning resolution", P.appending(path: \.inlay.resolution))
-            num("Safe Z", P.appending(path: \.inlay.safeZ))
-            rpm("Spindle speed (0 = off)", P.appending(path: \.inlay.spindleRPM))
+            rpm("Spindle speed (0 = machine max)", P.appending(path: \.inlay.spindleRPM))
+            FeedCalculatorRow(flutes: Binding(get: { defaults.file.project.inlay.flutes }, set: { defaults.file.project.inlay.flutes = $0 })) {
+                defaults.file.project.inlay.calculateFeeds(defaults.file.project.cnc)
+            }
+            FeedAdvice(check: defaults.file.project.inlay.check(defaults.file.project.cnc))
             flag("Climb milling", P.appending(path: \.inlay.climb))
             HStack(spacing: 4) {
                 ForEach(InlayOrigin.allCases) { o in
@@ -270,9 +304,7 @@ struct SettingsView: View {
     private var template: some View {
         Group {
             let T = \DefaultsFile.fretTemplate
-            num("Hole diameter", T.appending(path: \.holeDiameter))
             num("Plunge depth", T.appending(path: \.plungeDepth))
-            num("Safe Z", T.appending(path: \.safeZ))
             num("Feed", T.appending(path: \.feed), "mm/min")
             HStack(spacing: 4) {
                 LatchButton(title: "( COMMENTS )", on: defaults.file.fretTemplate.commentStyle == .parentheses) {

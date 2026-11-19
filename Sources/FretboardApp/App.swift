@@ -42,6 +42,13 @@ struct FretboardApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("New Project") { project.newProject() }.keyboardShortcut("n")
                 Button("Open…") { project.openWithPanel() }.keyboardShortcut("o")
+                Menu("Open Recent") {
+                    ForEach(project.recents, id: \.self) { u in
+                        Button(u.deletingPathExtension().lastPathComponent) { project.open(url: u) }
+                    }
+                    if !project.recents.isEmpty { Divider() }
+                    Button("Clear Menu") { project.clearRecents() }.disabled(project.recents.isEmpty)
+                }
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save") { project.save() }.keyboardShortcut("s")

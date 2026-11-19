@@ -4,14 +4,15 @@ import simd
 /// Cutting settings for the dot pockets (normally the same 6 mm cutter as the main job).
 public struct DotCutSettings: Equatable, Sendable, Codable {
     public var cutterDiameter = 6.0
+    public var flutes = 2
     /// Each peck goes this much deeper before the cutter lifts to clear chips.
     public var peckDepth = 1.0
     public var plungeFeed = 300.0
     public var xyFeed = 600.0
     /// Stepover (fraction of the cutter diameter) when a dot is larger than the cutter.
     public var stepover = 0.4
+    /// 0 = the machine's maximum spindle speed.
     public var spindleRPM = 0
-    public var safeZ = 5.0
     public init() {}
 }
 
@@ -27,6 +28,7 @@ public enum InlayOrigin: Int, CaseIterable, Sendable, Identifiable, Codable {
 /// Cutting settings for the custom inlay pocket with a small, fragile cutter.
 public struct InlayCutSettings: Equatable, Sendable, Codable {
     public var cutterDiameter = 0.9
+    public var flutes = 2
     public var fluteLength = 9.0
     public var depthPerLayer = 0.3
     /// Fraction of the cutter diameter.
@@ -44,8 +46,8 @@ public struct InlayCutSettings: Equatable, Sendable, Codable {
     public var origin: InlayOrigin = .board
     /// Raster cell used to plan the pocket. Smaller is more accurate and slower.
     public var resolution = 0.025
+    /// 0 = the machine's maximum spindle speed.
     public var spindleRPM = 0
-    public var safeZ = 5.0
     public init() {}
 }
 
@@ -105,9 +107,9 @@ public enum MarkerToolpath {
         }
     }
 
-    static func machineSettings(_ cnc: CNCSettings, cutter: Double, xy: Double, z: Double, safeZ: Double, rpm: Int) -> CNCSettings {
+    static func machineSettings(_ cnc: CNCSettings, cutter: Double, rpm: Int) -> CNCSettings {
         var s = cnc
-        s.cutterDiameter = cutter; s.xyFeed = xy; s.zFeed = z; s.safeZ = safeZ; s.spindleRPM = rpm
+        s.cutterDiameter = cutter; s.spindleRPM = rpm
         return s
     }
 
@@ -127,7 +129,7 @@ public enum MarkerToolpath {
         guard !centres.isEmpty, validate(dots: s, markers: m).isEmpty else { return nil }
         let T = cnc.stockThickness
         let op = CutOperation.dotPocket
-        var mv = Mover(pos: SIMD3(0, 0, s.safeZ), rapidFeed: cnc.rapidFeed, zFeed: s.plungeFeed, safeZ: s.safeZ)
+        var mv = Mover(pos: SIMD3(0, 0, cnc.safeZ), rapidFeed: cnc.rapidFeed, zFeed: s.plungeFeed, safeZ: cnc.safeZ)
         let r = s.cutterDiameter / 2
         let ringR = m.dotDiameter / 2 - r
         let step = s.cutterDiameter * s.stepover
@@ -135,8 +137,8 @@ public enum MarkerToolpath {
         for c in centres.sorted(by: { $0.x != $1.x ? $0.x < $1.x : $0.y < $1.y }) {
             let surf = L.topZ(x: c.x, y: c.y) - T
             let floor = surf - m.dotDepth
-            mv.rapid(SIMD3(mv.pos.x, mv.pos.y, s.safeZ), op)
-            mv.rapid(SIMD3(c.x, c.y, s.safeZ), op)
+            mv.rapid(SIMD3(mv.pos.x, mv.pos.y, cnc.safeZ), op)
+            mv.rapid(SIMD3(c.x, c.y, cnc.safeZ), op)
             // Never rapid below the safe height: the work Z may not match the model, so go down at plunge feed.
             mv.cut(SIMD3(c.x, c.y, surf), op, feed: s.xyFeed)
             var z = surf
@@ -162,15 +164,15 @@ public enum MarkerToolpath {
                 }
                 if z > floor + 1e-9 { mv.rapid(SIMD3(c.x, c.y, surf + 0.5), op) }   // clear chips
             }
-            mv.retract(s.safeZ, op)
+            mv.retract(cnc.safeZ, op)
         }
-        mv.retract(s.safeZ, op)
-        mv.rapid(SIMD3(0, 0, s.safeZ), op)
-        let ms = machineSettings(cnc, cutter: s.cutterDiameter, xy: s.xyFeed, z: s.plungeFeed, safeZ: s.safeZ, rpm: s.spindleRPM)
-        let tp = Toolpath(start: SIMD3(0, 0, s.safeZ), moves: mv.moves, settings: ms)
+        mv.retract(cnc.safeZ, op)
+        mv.rapid(SIMD3(0, 0, cnc.safeZ), op)
+        let ms = machineSettings(cnc, cutter: s.cutterDiameter, rpm: s.spindleRPM)
+        let tp = Toolpath(start: SIMD3(0, 0, cnc.safeZ), moves: mv.moves, settings: ms)
         var h: [String] = []
         h.append("; Fretboard Modeller - fret marker dots - \(cnc.machine.title)")
-        h.append("; Work origin: SAME AS THE BOARD JOB - X0 = heel edge of board, Y0 = board centre line, Z0 = TOP of original stock")
+        h.append("; Work origin: SAME AS THE BOARD JOB - X0 = heel edge of board, Y0 = board centre line, Z0 = \(cnc.zZeroName)")
         h.append(String(format: "; Stock %.2f mm thick (from the board job). Run after surfacing, before the board is released from its tabs.", T))
         h.append(String(format: "; Cutter: %.2f mm flat end mill. %d dots, %.2f mm diameter, %.2f mm deep below the surface at each centre (flat floor).",
                         s.cutterDiameter, centres.count, m.dotDiameter, m.dotDepth))
@@ -213,7 +215,7 @@ public enum MarkerToolpath {
         let z0 = s.origin == .board ? T : L.topZ(x: centre.x, y: centre.y)
         func surf(_ p: SIMD2<Double>) -> Double { L.topZ(x: p.x, y: p.y) - z0 }
         func out(_ p: SIMD2<Double>, _ depth: Double) -> SIMD3<Double> { SIMD3(p.x - off.x, p.y - off.y, surf(p) - depth) }
-        let clear = s.safeZ   // all travel moves stay at the safe height
+        let clear = cnc.safeZ   // all travel moves stay at the safe height
 
         // What the cutter cannot reach: farther than r from every point where its centre fits.
         let reach = Raster.edt(dist) { Double($0) >= r - 1e-9 }
@@ -273,7 +275,7 @@ public enum MarkerToolpath {
 
         let layers = max(1, Int(ceil(m.inlay.depth / s.depthPerLayer - 1e-9)))
         let depths = (1...layers).map { min(m.inlay.depth, Double($0) * s.depthPerLayer) }
-        var mv = Mover(pos: SIMD3(0, 0, s.safeZ), rapidFeed: cnc.rapidFeed, zFeed: s.plungeFeed, safeZ: s.safeZ)
+        var mv = Mover(pos: SIMD3(0, 0, cnc.safeZ), rapidFeed: cnc.rapidFeed, zFeed: s.plungeFeed, safeZ: cnc.safeZ)
         let tanA = tan(s.rampAngle * Double.pi / 180)
         let slotFeed = s.xyFeed * s.slotFeedFactor
 
@@ -342,15 +344,16 @@ public enum MarkerToolpath {
             }
             mv.retract(clear, .inlayFinish)
         }
-        mv.retract(s.safeZ, .inlayFinish)
-        mv.rapid(SIMD3(0, 0, s.safeZ), .inlayFinish)
+        mv.retract(cnc.safeZ, .inlayFinish)
+        mv.rapid(SIMD3(0, 0, cnc.safeZ), .inlayFinish)
 
-        let ms = machineSettings(cnc, cutter: s.cutterDiameter, xy: s.xyFeed, z: s.plungeFeed, safeZ: s.safeZ, rpm: s.spindleRPM)
-        let tp = Toolpath(start: SIMD3(0, 0, s.safeZ), moves: mv.moves, settings: ms)
+        var ms = machineSettings(cnc, cutter: s.cutterDiameter, rpm: s.spindleRPM)
+        if s.origin != .board { ms.zZero = .workpieceTop }   // Z0 is on the board surface at the inlay centre
+        let tp = Toolpath(start: SIMD3(0, 0, cnc.safeZ), moves: mv.moves, settings: ms)
         var hd: [String] = []
         hd.append("; Fretboard Modeller - fret \(m.inlay.fret) inlay pocket - \(cnc.machine.title)")
         if s.origin == .board {
-            hd.append("; Work origin: SAME AS THE BOARD JOB - X0 = heel edge of board, Y0 = board centre line, Z0 = TOP of original stock")
+            hd.append("; Work origin: SAME AS THE BOARD JOB - X0 = heel edge of board, Y0 = board centre line, Z0 = \(cnc.zZeroName)")
             hd.append(String(format: "; Stock %.2f mm thick (from the board job). Run after surfacing, before the board is released from its tabs.", T))
             hd.append(String(format: "; Inlay centre is at X%.3f Y%.3f; the board surface there is Z%.3f", centre.x, centre.y, surf(centre)))
         } else {

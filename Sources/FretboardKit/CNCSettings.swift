@@ -8,6 +8,8 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     public var machine = Machine.workbee
     /// Flat end mill diameter.
     public var cutterDiameter = 6.0
+    /// Flutes on the board cutter, used to calculate feeds from chip load.
+    public var cutterFlutes = 2
 
     // Blank (stock). Board X0 is its heel edge, Y0 its centre line; the blank is centred on Y0.
     /// Stock thickness. The bottom of the board is the bottom of the stock (Z = -stockThickness).
@@ -17,11 +19,36 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     /// Distance from the blank's heel-side edge to the board's heel edge (X0).
     public var stockHeelMargin = 20.0
 
-    // Motion limits (starting values come from the selected machine)
-    public var xyFeed = 1000.0           // mm/min, X/Y cutting
-    public var zFeed = 800.0             // mm/min, Z cutting (plunges)
-    /// Fast travel. Default is Ooznest's documented maximum feed rate; set it to your machine's configured maximum.
+    // Machine limits. Cutting feeds are per cutter and per stage (see StageFeed), calculated within these.
+    /// Fast travel: set it to the machine's configured maximum.
     public var rapidFeed = 2500.0
+    /// Fastest cutting feed the machine sustains; calculated feeds are capped here.
+    public var maxCuttingFeed = 2500.0
+    /// Top spindle speed. 0 = the spindle is controlled by hand: no M3/M5 is written.
+    public var maxSpindleRPM = 0
+
+    /// X/Y and plunge feed for one stage of the board job.
+    /// Where Z0 sits for every board-origin job (board, nut slot, dots, inlay): the top of the workpiece
+    /// (probed on the stock) or the spoilboard surface (the bottom of the stock).
+    public enum ZZero: String, CaseIterable, Codable, Sendable, Identifiable {
+        case workpieceTop, spoilboard
+        public var id: String { rawValue }
+        public var title: String { self == .workpieceTop ? "Workpiece top" : "Spoilboard" }
+    }
+    public var zZero = ZZero.workpieceTop
+    /// Added to every Z the writer outputs (the model works with Z0 at the top of the stock).
+    public var zOffset: Double { zZero == .spoilboard ? stockThickness : 0 }
+    /// For G-code headers.
+    public var zZeroName: String { zZero == .spoilboard ? "SPOILBOARD surface (bottom of the stock)" : "TOP of stock" }
+
+    public struct StageFeed: Equatable, Sendable, Codable {
+        public var xy: Double
+        public var z: Double
+        public init(xy: Double, z: Double) { self.xy = xy; self.z = z }
+    }
+    public var roughFeed = StageFeed(xy: 2500, z: 1000)
+    public var finishFeed = StageFeed(xy: 2000, z: 800)
+    public var outlineFeed = StageFeed(xy: 2000, z: 800)
 
     public var roughDepthPerPass = 1.5
     /// Material left on the surface and outline by the roughing passes.
@@ -53,10 +80,25 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     public var outlineSpringPass = false
     /// The Fender-style nut channel, cut with its own bit as a second job.
     public var nutSlot = NutSlotSettings()
-    /// Spindle speed for M3 (0 = no spindle commands, e.g. a manually controlled router). GRBL spindles use S as rpm.
+    /// Board cutter speed (0 = the machine's maximum). GRBL spindles use S as rpm.
     public var spindleRPM = 0
 
-    public init() {}
+    public init() { calculateFeeds() }
+
+    /// Feeds for a board-job operation.
+    public func stageFeed(_ op: CutOperation) -> StageFeed {
+        switch op {
+        case .finishSurface: return finishFeed
+        case .finishOutline: return outlineFeed
+        default: return roughFeed
+        }
+    }
+
+    /// The speed written with M3: the cutter's speed capped at the machine maximum, or the maximum when the cutter
+    /// has none set. 0 when the spindle is manual.
+    public var activeSpindleRPM: Int {
+        maxSpindleRPM <= 0 ? 0 : (spindleRPM > 0 ? min(spindleRPM, maxSpindleRPM) : maxSpindleRPM)
+    }
 
     public var cutterRadius: Double { cutterDiameter / 2 }
     public var stockMinX: Double { -stockHeelMargin }
@@ -83,7 +125,8 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     public func validate(for params: FretboardParameters) -> [String] {
         var e: [String] = []
         if cutterDiameter <= 0 { e.append("Cutter diameter must be positive.") }
-        if xyFeed <= 0 || zFeed <= 0 || rapidFeed <= 0 { e.append("Feed rates must be positive.") }
+        if rapidFeed <= 0 || maxCuttingFeed <= 0 || maxSpindleRPM < 0 { e.append("Machine limits must be positive.") }
+        for f in [roughFeed, finishFeed, outlineFeed] where f.xy <= 0 || f.z <= 0 { e.append("Feed rates must be positive."); break }
         if roughDepthPerPass <= 0 { e.append("Roughing depth per pass must be positive.") }
         if roughAllowance < 0 { e.append("Roughing allowance cannot be negative.") }
         if !(0..<1).contains(roughOverlap) || !(0..<1).contains(finishOverlap) {

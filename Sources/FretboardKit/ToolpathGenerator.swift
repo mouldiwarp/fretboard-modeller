@@ -137,10 +137,11 @@ public enum ToolpathGenerator {
         mutating func cut(_ p: SIMD3<Double>, _ op: CutOperation) {
             let d = p - pos
             let xy = (d.x * d.x + d.y * d.y).squareRoot()
-            var feed = s.xyFeed
+            let st = s.stageFeed(op)
+            var feed = st.xy
             if abs(d.z) > 1e-9 {
                 let len = simd_length(d)
-                feed = xy < 1e-9 ? s.zFeed : min(s.xyFeed, s.zFeed * len / abs(d.z))
+                feed = xy < 1e-9 ? st.z : min(st.xy, st.z * len / abs(d.z))
             }
             moves.append(Move(kind: .cut, op: op, to: p, feed: feed)); pos = p
         }

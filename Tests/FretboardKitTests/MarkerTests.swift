@@ -203,7 +203,7 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
         if mv.kind == .cut && d.z < -1e-6 {
             if xy < 1e-6 {
                 // Only the short drop through already-cut air, or the feed-speed descent from the safe height.
-                #expect(-d.z <= 0.2 + 1e-6 || p.z >= s.safeZ - 1e-9)
+                #expect(-d.z <= 0.2 + 1e-6 || p.z >= CNCSettings().safeZ - 1e-9)
             } else {
                 // Descent along the path, allowing for the surface curve under the cutter.
                 #expect(-d.z / xy <= tanA + 0.02)

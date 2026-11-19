@@ -85,7 +85,7 @@ final class MarkerStore: ObservableObject {
     }
 
     /// Height (across the board) of the bundled default inlay.
-    static let defaultInlayHeight = 45.0
+    static let defaultInlayHeight = 58.0
 
     static let defaultInlayImage: NSImage? = {
         let candidates = [
@@ -97,7 +97,7 @@ final class MarkerStore: ObservableObject {
         return candidates.compactMap { $0 }.lazy.compactMap { NSImage(contentsOf: $0) }.first
     }()
 
-    /// Traces the bundled default design, 45 mm tall, used when a 12th-fret inlay is chosen with no image.
+    /// Traces the bundled default design, 58 mm tall, used when a 12th-fret inlay is chosen with no image.
     func useDefaultImage() {
         guard let img = Self.defaultInlayImage else { return }
         setImage(img, name: "Default inlay", height: Self.defaultInlayHeight)
