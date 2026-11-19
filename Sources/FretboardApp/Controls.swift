@@ -47,13 +47,14 @@ struct LampFace: View {
 /// Uppercase section caption with a gold hairline.
 struct SectionLabel: View {
     let text: String
-    init(_ text: String) { self.text = text }
+    var size: CGFloat = 10
+    init(_ text: String, size: CGFloat = 10) { self.text = text; self.size = size }
 
     var body: some View {
         HStack(spacing: 6) {
             Text(text.uppercased())
-                .font(Theme.caption(10))
-                .tracking(1.2)
+                .font(Theme.caption(size))
+                .tracking(size > 12 ? 1.6 : 1.2)
                 .foregroundStyle(Theme.gold)
                 .lineLimit(1)
                 .fixedSize()

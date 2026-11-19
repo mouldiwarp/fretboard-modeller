@@ -18,19 +18,35 @@ final class ProjectController: ObservableObject {
     /// Recently opened or saved projects, newest first (files that no longer exist are dropped).
     @Published private(set) var recents: [URL] = []
 
+    private static let recentsKey = "recentProjectPaths"
+    private static let recentsLimit = 12
+
+    /// The app keeps its own list (macOS's recent-documents list is not reliably kept for apps without a document
+    /// architecture). It is seeded from the system list the first time.
+    private var storedRecents: [String] {
+        get {
+            if let s = UserDefaults.standard.stringArray(forKey: Self.recentsKey) { return s }
+            return NSDocumentController.shared.recentDocumentURLs.map(\.path)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: Self.recentsKey) }
+    }
+
     func refreshRecents() {
-        recents = NSDocumentController.shared.recentDocumentURLs.filter {
+        recents = storedRecents.map { URL(fileURLWithPath: $0) }.filter {
             $0.pathExtension == ProjectFile.fileExtension && FileManager.default.fileExists(atPath: $0.path)
         }
     }
 
     func clearRecents() {
+        storedRecents = []
         NSDocumentController.shared.clearRecentDocuments(nil)
         refreshRecents()
     }
 
     private func noteRecent(_ u: URL) {
         NSDocumentController.shared.noteNewRecentDocumentURL(u)
+        let path = u.standardizedFileURL.path
+        storedRecents = Array(([path] + storedRecents.filter { $0 != path }).prefix(Self.recentsLimit))
         refreshRecents()
     }
 
@@ -63,6 +79,8 @@ final class ProjectController: ObservableObject {
         model.markers = p.markers
         toolpath.settings = p.cnc
         toolpath.clear()
+        // An inlay mode with no artwork would show nothing: start from the bundled default, which can be replaced.
+        if p.markers.mode.hasInlay && p.image == nil && model.markers.inlay.artwork == nil { markers.useDefaultImage() }
     }
 
     /// Replaces every setting with the user's defaults, keeping the inlay image and artwork.

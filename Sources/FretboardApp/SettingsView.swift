@@ -16,26 +16,56 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 header
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3), alignment: .leading, spacing: 12) {
-                    card("Board") { board }
-                    card("Truss rod & cutout") { cutout }
-                    card("Blank (stock)") { blank }
-                    card("Machine") { cutter }
-                    card("Board cutter") { boardCutter }
-                    card("Roughing & finishing") { passes }
-                    card("Outline, tabs & accuracy") { outline }
-                    card("Fret dots") { dots }
-                    card("12th fret inlay") { inlay }
-                    card("Inlay cutter") { inlayCutter }
-                    card("Strings & marker layout") { strings }
-                    card("Inlay image trace") { trace }
-                    card("Fender nut slot") { nutSlot }
-                    card("Fret template") { template }
-                    card("KerfLine") { controller }
+                // Four columns of cards, grouped by job and balanced in height so there is no dead space.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 12) {
+                        column { c1 }; column { c2 }; column { c3 }; column { c4 }
+                    }
+                    .frame(minWidth: 1180)
+                    HStack(alignment: .top, spacing: 12) {
+                        column { c1; c2 }
+                        column { c3; c4 }
+                    }
                 }
             }
             .padding(14)
         }
+    }
+
+    // MARK: Layout
+
+    private func column<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 12) { content() }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    /// Board, blank and the fret template.
+    @ViewBuilder private var c1: some View {
+        card("Board, truss rod & cutout") { board; SectionLabel("Truss rod & cutout", size: 12).padding(.top, 6); cutout }
+        card("Blank (stock)") { blank }
+        card("Fret template") { template }
+    }
+
+    /// The machine, its board cutter, and the nut slot.
+    @ViewBuilder private var c2: some View {
+        card("Machine") { cutter }
+        card("Board cutter") { boardCutter }
+        card("Fender nut slot") { nutSlot }
+        card("KerfLine") { controller }
+    }
+
+    /// The board job's passes and the inlay cutter.
+    @ViewBuilder private var c3: some View {
+        card("Roughing, finishing & outline") { passes; SectionLabel("Outline, tabs & accuracy", size: 12).padding(.top, 6); outline }
+        card("Inlay cutter") { inlayCutter }
+    }
+
+    /// Markers: dots, strings, the inlay and its trace.
+    @ViewBuilder private var c4: some View {
+        card("Fret dots") { dots }
+        card("Strings & marker layout") { strings }
+        card("12th fret inlay") { inlay }
+        card("Inlay image trace") { trace }
     }
 
     // MARK: KerfLine
@@ -321,7 +351,7 @@ struct SettingsView: View {
 
     private func card<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(title)
+            SectionLabel(title, size: 15)
             content()
         }
         .padding(12)
