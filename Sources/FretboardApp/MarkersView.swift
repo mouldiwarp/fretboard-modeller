@@ -474,7 +474,7 @@ struct MarkerJobsPanel: View {
                         }
                         .help("Send to KerfLine at \(GCodeHub.address)")
                     }
-                    Text("Fragile cutter: every entry ramps in along the path, the first loop after each entry runs at the slot feed, and each layer ends with a light finishing pass on the walls. Air-cut first with Z raised.")
+                    Text("Fragile cutter: every entry ramps in along the path (at most two laps; loops smaller than the cutter are plunged), the first loop after each entry runs at the slot feed, and each layer ends with a light finishing pass on the walls. Air-cut first with Z raised.")
                         .font(Theme.heading(10)).foregroundStyle(Theme.dim)
                 }
             }

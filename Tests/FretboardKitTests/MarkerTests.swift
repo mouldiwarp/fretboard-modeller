@@ -166,6 +166,27 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
     return (L, m, MarkerToolpath.inlay(layout: L, markers: m, settings: s, cnc: CNCSettings())!)
 }
 
+/// Ramping round the tiny innermost loops used to take dozens of laps of 0.01 mm moves: GRBL can't stream moves that
+/// short as fast as it cuts them, so the machine stuttered and buzzed. No long runs of tiny moves, and no ramp goes
+/// round more than twice.
+@Test func inlayHasNoRunsOfTinyMoves() {
+    do {
+        // On the test artwork a 1.5 mm cutter leaves tiny innermost loops (like the 0.9 mm on a real logo).
+        let tool = 1.5
+        let (_, _, job) = inlayJob { $0.cutterDiameter = tool; $0.depthPerLayer = 0.6 }
+        var pos = job.toolpath.start, run = 0, longest = 0, tiny = 0, cuts = 0
+        for m in job.toolpath.moves {
+            if m.kind == .cut {
+                cuts += 1
+                if simd_distance(pos, m.to) < 0.05 { run += 1; tiny += 1; longest = max(longest, run) } else { run = 0 }
+            }
+            pos = m.to
+        }
+        #expect(longest < 25, "\(tool) mm: \(longest) moves under 0.05 mm in a row")
+        #expect(Double(tiny) < 0.3 * Double(cuts), "\(tool) mm: \(tiny) of \(cuts) moves under 0.05 mm")
+    }
+}
+
 @Test func inlayToolpathStaysInsideThePocketAndAboveTheFloor() {
     let (L, m, job) = inlayJob()
     let s = InlayCutSettings()
@@ -192,26 +213,33 @@ func inlayJob(_ origin: InlayOrigin = .board, _ edit: (inout InlayCutSettings) -
     #expect(job.toolpath.moves.contains { $0.op == .inlayFinish } && job.toolpath.moves.contains { $0.op == .inlayClear })
 }
 
+/// Entries ramp at the set angle. A ramp is at most two laps, so on a short loop it is steeper (at most a layer over
+/// two cutter widths), and a loop smaller than the cutter is entered by a plunge of one layer at plunge feed.
 @Test func inlayEntersOnRampsNotPlunges() {
     let (_, _, job) = inlayJob()
-    let s = InlayCutSettings()
+    var s = InlayCutSettings(); s.depthPerLayer = 0.4
     let tanA = tan(s.rampAngle * Double.pi / 180)
-    var p = job.toolpath.start
+    let steepest = max(tanA, s.depthPerLayer / (2 * s.cutterDiameter))
+    var p = job.toolpath.start, ramps = 0, steep = 0
     for mv in job.toolpath.moves {
         let d = mv.to - p
         let xy = (d.x * d.x + d.y * d.y).squareRoot()
         if mv.kind == .cut && d.z < -1e-6 {
             if xy < 1e-6 {
-                // Only the short drop through already-cut air, or the feed-speed descent from the safe height.
-                #expect(-d.z <= 0.2 + 1e-6 || p.z >= CNCSettings().safeZ - 1e-9)
+                // The short drop through already-cut air, the feed-speed descent from the safe height, or a plunge
+                // into a loop smaller than the cutter.
+                #expect(-d.z <= 0.2 + 1e-6 || p.z >= CNCSettings().safeZ - 1e-9 || -d.z <= s.depthPerLayer + 1e-6)
+                #expect(mv.feed <= s.plungeFeed + 1e-6)
             } else {
                 // Descent along the path, allowing for the surface curve under the cutter.
-                #expect(-d.z / xy <= tanA + 0.02)
+                ramps += 1
+                if -d.z / xy > tanA + 0.02 { steep += 1 }
+                #expect(-d.z / xy <= steepest + 0.02)
             }
-            #expect(mv.feed <= s.plungeFeed + 1e-6 || xy > 1e-6)
         }
         p = mv.to
     }
+    #expect(ramps > 0 && steep < ramps)
 }
 
 @Test func inlayToolpathClearsThePocket() {

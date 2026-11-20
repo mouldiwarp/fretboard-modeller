@@ -316,7 +316,12 @@ public enum MarkerToolpath {
                             mv.rapid(out(pts[0], prevDepth - 0.2), op)
                             mv.cut(out(pts[0], prevDepth), op, feed: slotFeed)
                         }
-                        let rampLen = (depth - prevDepth) / tanA
+                        // Ramp along the loop, for at most two laps (steeper on a short loop). A loop shorter than the
+                        // cutter's width sits inside its own footprint, so ramping round it is a plunge done as hundreds
+                        // of tiny moves GRBL can't stream fast enough: go straight down at plunge feed instead.
+                        let perimeter = zip(p, p.dropFirst()).reduce(0.0) { $0 + simd_distance($1.0, $1.1) }
+                        let rampLen = perimeter < s.cutterDiameter ? 0 : min((depth - prevDepth) / tanA, 2 * perimeter)
+                        if rampLen == 0 { mv.cut(out(pts[0], depth), op, feed: s.plungeFeed) }
                         var travelled = 0.0
                         var k = 0
                         var last = pts[0]
@@ -363,7 +368,7 @@ public enum MarkerToolpath {
         hd.append(String(format: "; Cutter: %.2f mm flat end mill (flute %.1f mm). Inside corners are rounded to %.2f mm radius.", s.cutterDiameter, s.fluteLength, r))
         hd.append(String(format: "; Pocket %.2f mm deep, floor follows the board radius. %d layers of %.2f mm; stepover %.0f%%; %.2f mm left for the finishing loop.",
                          m.inlay.depth, layers, s.depthPerLayer, s.stepover * 100, s.wallAllowance))
-        hd.append(String(format: "; Entry: %.1f° ramps along the path. Feeds: X/Y %.0f (%.0f in full-width slots), plunge %.0f, rapid %.0f mm/min",
+        hd.append(String(format: "; Entry: %.1f° ramps along the path, at most 2 laps; loops smaller than the cutter plunge. Feeds: X/Y %.0f (%.0f in full-width slots), plunge %.0f, rapid %.0f mm/min",
                          s.rampAngle, s.xyFeed, slotFeed, s.plungeFeed, cnc.rapidFeed))
         hd.append(String(format: "; Milling: %@", s.climb ? "climb (clockwise spindle)" : "conventional"))
         hd.append("; Estimated run time: " + GCodeWriter.formatTime(tp.totalTime))
