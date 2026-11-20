@@ -24,7 +24,8 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     public var rapidFeed = 2500.0
     /// Fastest cutting feed the machine sustains; calculated feeds are capped here.
     public var maxCuttingFeed = 2500.0
-    /// Top spindle speed. 0 = the spindle is controlled by hand: no M3/M5 is written.
+    /// Top spindle speed. 0 = the spindle is controlled by hand: no M3/M5 is written. A GRBL machine's spindle is
+    /// always under G-code control, so there 0 means the preset's maximum instead (see `spindleLimitRPM`).
     public var maxSpindleRPM = 0
 
     /// X/Y and plunge feed for one stage of the board job.
@@ -97,7 +98,19 @@ public struct CNCSettings: Equatable, Sendable, Codable {
     /// The speed written with M3: the cutter's speed capped at the machine maximum, or the maximum when the cutter
     /// has none set. 0 when the spindle is manual.
     public var activeSpindleRPM: Int {
-        maxSpindleRPM <= 0 ? 0 : (spindleRPM > 0 ? min(spindleRPM, maxSpindleRPM) : maxSpindleRPM)
+        let top = spindleLimitRPM
+        return top <= 0 ? 0 : (spindleRPM > 0 ? min(spindleRPM, top) : top)
+    }
+
+    /// The top spindle speed in force. On a GRBL machine a file without M3 runs the cutter with the spindle off
+    /// (GRBL's spindle button can't start it), so 0 there falls back to the preset's maximum: never a manual spindle.
+    public var spindleLimitRPM: Int {
+        maxSpindleRPM > 0 ? maxSpindleRPM : (machine.usesGRBL ? machine.defaults.maxSpindleRPM : 0)
+    }
+
+    /// Label for the max spindle field: what 0 means on this machine.
+    public var maxSpindleTitle: String {
+        machine.usesGRBL ? "Max spindle (0 = \(machine.defaults.maxSpindleRPM))" : "Max spindle (0 = manual)"
     }
 
     public var cutterRadius: Double { cutterDiameter / 2 }

@@ -488,6 +488,26 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
         #expect(f.activeSpindleRPM == 24000)   // capped at the machine maximum
     }
 
+    /// A GRBL machine's spindle is always under G-code control: a max spindle of 0 (left over from the WorkBee, say)
+    /// still writes M3 at the preset's maximum, so the cutter never runs with the spindle off.
+    @Test func grblNeverWritesAManualSpindleFile() throws {
+        var c = CNCSettings(); c.select(.foxalien); c.maxSpindleRPM = 0
+        #expect(c.activeSpindleRPM == 24000)
+        #expect(c.maxSpindleTitle.contains("24000"))
+        c.spindleRPM = 12000
+        #expect(c.activeSpindleRPM == 12000)
+        let l = FretboardLayout(FretboardParameters())
+        let g = GCodeWriter.write(ToolpathGenerator.generate(layout: l, settings: c), params: l.params)
+        let lines = g.split(separator: "\n").map(String.init)
+        let m3 = try #require(lines.firstIndex(of: "M3 S12000"))
+        #expect(lines[m3 + 1] == "G4 P5")
+        let firstCut = try #require(lines.firstIndex { $0.hasPrefix("G1 ") })
+        #expect(m3 < firstCut)
+        #expect(lines.suffix(2) == ["M5", "M2"])
+        var w = CNCSettings(); w.select(.workbee)
+        #expect(w.activeSpindleRPM == 0 && w.maxSpindleTitle.contains("manual"))
+    }
+
     @Test func stagesUseTheirOwnFeeds() throws {
         var c = CNCSettings(); c.select(.foxalien)
         c.roughFeed = .init(xy: 3000, z: 700); c.finishFeed = .init(xy: 1500, z: 300); c.outlineFeed = .init(xy: 1200, z: 200)

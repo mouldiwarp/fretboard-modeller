@@ -186,7 +186,7 @@ struct CNCSettingsPanel: View {
                 SectionLabel("Machine limits").padding(.top, 4)
                 NumberField(title: "Fast travel", value: $tp.settings.rapidFeed, unit: "mm/min")
                 NumberField(title: "Max cutting feed", value: $tp.settings.maxCuttingFeed, unit: "mm/min")
-                NumberField(title: "Max spindle (0 = manual)", value: Binding(get: { Double(tp.settings.maxSpindleRPM) },
+                NumberField(title: tp.settings.maxSpindleTitle, value: Binding(get: { Double(tp.settings.maxSpindleRPM) },
                                                                               set: { tp.settings.maxSpindleRPM = max(0, Int($0)) }), unit: "rpm")
                 NumberField(title: "Safe Z above stock", value: $tp.settings.safeZ)
                 FieldCaption("Z zero (all toolpaths)")

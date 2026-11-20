@@ -185,7 +185,7 @@ struct SettingsView: View {
             }
             num("Rapid feed", P.appending(path: \.cnc.rapidFeed), "mm/min")
             num("Max cutting feed", P.appending(path: \.cnc.maxCuttingFeed), "mm/min")
-            rpm("Max spindle speed (0 = manual)", P.appending(path: \.cnc.maxSpindleRPM))
+            rpm(defaults.file.project.cnc.maxSpindleTitle, P.appending(path: \.cnc.maxSpindleRPM))
             num("Safe Z", P.appending(path: \.cnc.safeZ))
             FieldCaption("Z zero (all toolpaths)")
             HStack(spacing: 4) {
