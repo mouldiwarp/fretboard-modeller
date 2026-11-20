@@ -235,6 +235,39 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     #expect(Set(none.moves.filter { $0.op == .finishOutline && $0.kind == .cut }.map { ($0.to.z * 1000).rounded() / 1000 }).count == 1)
 }
 
+/// The roughing trench leaves the tabs standing too. Before, it cleared the whole trench to its 0.5 mm floor, so the
+/// finish outline lifted over air and the "tabs" were only the floor skin.
+@Test func roughOutlineLeavesTheTabs() {
+    let (l, t) = job()
+    let s = t.settings
+    let tabZ = -s.stockThickness + s.tabHeight
+    #expect(s.outlineFloorAllowance < s.tabHeight)
+    let k = s.tabCount / 2
+    let centres = (0..<k).map { l.xEnd * (Double($0) + 0.5) / Double(k) }
+    /// The lowest Z the rough outline cuts at over the tabs, and how many points it checked.
+    func overTabs(_ t: Toolpath) -> (low: Double, points: Int) {
+        var p = t.start, low = Double.infinity, n = 0
+        for m in t.moves {
+            defer { p = m.to }
+            guard m.op == .roughOutline, m.kind == .cut else { continue }
+            let steps = max(1, Int(simd_distance(p, m.to) / 0.5))
+            for i in 0...steps {
+                let q = p + (m.to - p) * (Double(i) / Double(steps))
+                guard abs(q.y) > 5, centres.contains(where: { abs(q.x - $0) < s.tabWidth / 2 }) else { continue }
+                n += 1
+                low = min(low, q.z)
+            }
+        }
+        return (low, n)
+    }
+    let tabs = overTabs(t)
+    #expect(tabs.points > 0)
+    #expect(tabs.low >= tabZ - 1e-6, "cuts to \(tabs.low) over a tab, tab top \(tabZ)")
+    // With no tabs the trench goes to its floor everywhere.
+    let (_, none) = job(true) { $0.tabCount = 0 }
+    #expect(abs(overTabs(none).low - (-s.stockThickness + s.outlineFloorAllowance)) < 1e-6)
+}
+
 @Test func outlineDirectionCanBeReversed() {
     func area(_ t: Toolpath) -> Double {
         var p = t.start; var pts: [SIMD2<Double>] = []

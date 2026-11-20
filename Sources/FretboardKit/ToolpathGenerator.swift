@@ -290,6 +290,10 @@ public enum ToolpathGenerator {
             }
             guard !levels.isEmpty else { return }
             let op = CutOperation.roughOutline
+            // The trench leaves the tabs too: below tab height it lifts over the same spots as the finish outline,
+            // or the finish's tabs would stand over an empty trench, held only by its floor skin.
+            let tabZ = -T + s.tabHeight
+            let zones = loops.map { ToolpathGenerator.tabZones(layout: L, path: $0, settings: s) }
             var prevLevel: Double?
             for level in levels {
                 let start = SIMD3(outer.x, outer.y, level)
@@ -301,11 +305,32 @@ public enum ToolpathGenerator {
                 }
                 for (li, path) in loops.enumerated() {
                     if li > 0 { cut(SIMD3(path[0].x, path[0].y, level), op) }   // step in to the next loop
-                    for p in path.dropFirst() { cut(SIMD3(p.x, p.y, level), op) }
+                    walk(path, level: level, tabZ: max(level, tabZ), zones: zones[li], op)
                 }
                 prevLevel = level
             }
             retract(op)
+        }
+
+        /// Cuts along `path` (the cutter is at its first point, at `level`), lifting to `tabZ` over each arc-length
+        /// interval in `zones` and back down after it. Ends at `level`.
+        mutating func walk(_ path: [SIMD2<Double>], level: Double, tabZ: Double, zones: [(Double, Double)], _ op: CutOperation) {
+            let events = tabZ > level + 1e-9 ? zones.flatMap { [$0.0, $0.1] }.sorted() : []
+            var ei = 0, z = level, sa = 0.0
+            for i in 1..<path.count {
+                let a = path[i - 1], b = path[i], sb = sa + simd_distance(a, b)
+                while ei < events.count, events[ei] <= sb + 1e-9 {
+                    let e = max(events[ei], sa)
+                    let p = sb > sa ? a + (b - a) * ((e - sa) / (sb - sa)) : b
+                    cut(SIMD3(p.x, p.y, z), op)
+                    z = (z == level) ? tabZ : level
+                    cut(SIMD3(p.x, p.y, z), op)
+                    ei += 1
+                }
+                if simd_distance(SIMD2(pos.x, pos.y), b) > 1e-9 || abs(pos.z - z) > 1e-9 { cut(SIMD3(b.x, b.y, z), op) }
+                sa = sb
+            }
+            if z != level { cut(SIMD3(pos.x, pos.y, level), op) }
         }
 
         /// Full-depth cut round the board, leaving tabs. The cutter plunges 1 mm clear of the board and eases in to

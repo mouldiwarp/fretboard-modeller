@@ -51,7 +51,7 @@ The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 10
 - **Blank:** set the blank length, width, thickness and where the board sits in it before generating. The blank thickness is a *minimum*: it must be at least board thickness + material left + 0.5 mm so there is always a roughing pass. The path is clipped to the blank and checked against it.
 - **Sequence** (all aimed at reducing splitting):
   1. Rough the top surface – passes across the board width, extending past the edges, 1.5 mm deep, leaving 0.5 mm, 20 % overlap.
-  2. Rough a trench round the outline – 1.5× the cutter width, two loops on every depth layer, outer loop first and the loop beside the board last, leaving 0.5 mm.
+  2. Rough a trench round the outline – 1.5× the cutter width, two loops on every depth layer, outer loop first and the loop beside the board last, leaving 0.5 mm and stepping over the tabs.
   3. Finish the surface – 50 % overlap.
   4. Cut the outline at full depth, leaving tabs.
 - **Tabs:** default 4 tabs, 5 mm wide, 1.5 mm tall, hold the board in the blank on the final cut; cut them away by hand.

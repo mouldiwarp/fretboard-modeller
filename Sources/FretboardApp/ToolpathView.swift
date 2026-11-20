@@ -334,7 +334,7 @@ struct SummaryPanel: View {
                         }
                     }
                     SectionLabel("Sequence").padding(.top, 6)
-                    Text("1  Rough the top surface in passes across the board width, extending past the edges to the blank, leaving 0.5 mm.\n2  Rough a trench round the outline, outer loop then inner loop on every layer, leaving 0.5 mm on the edge and floor.\n3  Finish the surface at 50% overlap.\n4  Cut the outline at full depth, leaving tabs.")
+                    Text("1  Rough the top surface in passes across the board width, extending past the edges to the blank, leaving 0.5 mm.\n2  Rough a trench round the outline, outer loop then inner loop on every layer, leaving 0.5 mm on the edge and floor, stepping over the tabs.\n3  Finish the surface at 50% overlap.\n4  Cut the outline at full depth, leaving tabs.")
                         .font(Theme.heading(10.5)).foregroundStyle(Theme.dim)
                 } else {
                     Text("Generate a toolpath to see the job summary.")

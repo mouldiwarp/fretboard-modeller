@@ -64,7 +64,7 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <div class="note">The path is clipped to the blank and the app rejects a blank that cannot contain the board (1 mm all round). An amber warning appears if the blank is too tight for the outline trench.</div>
 <h3>Sequence</h3>
 <ol><li><b>Rough surface</b> – raster passes across the board width, running past the board edges, 1.5 mm deep, leaving 0.5 mm, 20 % overlap.</li>
-<li><b>Rough outline</b> – a trench round the board 1.5× the cutter width wide, cut as two loops on every depth layer: the outer loop first and the loop beside the board last, so the board edge gets the lightest cut. Leaves 0.5 mm on the edge and floor.</li>
+<li><b>Rough outline</b> – a trench round the board 1.5× the cutter width wide, cut as two loops on every depth layer: the outer loop first and the loop beside the board last, so the board edge gets the lightest cut. Leaves 0.5 mm on the edge and floor, and steps over the tabs so they stay full height.</li>
 <li><b>Finish surface</b> – 50 % overlap, removing the last 0.5 mm.</li>
 <li><b>Finish outline</b> – full-depth cut round the board, leaving tabs.</li></ol>
 <p>The order (surfaces and trench first, final outline last) is chosen to reduce splitting.</p>
