@@ -61,7 +61,7 @@ The **Toolpath** tab (⌘3) generates G-code and plays the run back at 1× to 10
 ![Toolpath](docs/img/toolpath.png)
 
 ## Fret Template
-Ported from the standalone Fret Template Builder. Computes fret positions from the nut (`d = L·(1 − 1/2^(n/12))`) and writes GRBL-style G-code that drills marker holes on the centre line (Y0) at each fret (fret 0 = X0). The Fender nut channel is not marked here: with a Fender-style nut the Toolpath tab machines it (see below). Defaults: 6 mm plunge, 200 mm/min (safe Z comes from the machine limits). No spindle commands – run the drill by hand. Scale length and fret count start from the designer's values.
+Ported from the standalone Fret Template Builder. Computes fret positions from the nut (`d = L·(1 − 1/2^(n/12))`) and writes GRBL-style G-code that drills marker holes on the centre line (Y0) at each fret (fret 0 = X0). The Fender nut channel is not marked here: with a Fender-style nut the Toolpath tab machines it (see below). Defaults: 6 mm plunge, 200 mm/min (safe Z comes from the machine limits). Starts the spindle with `M3 S…` and a spin-up pause, at the machine limits' max spindle speed (on a GRBL machine such as the FoxAlien, 0 means the preset's maximum), and stops it with `M5` at the end; with a manual spindle (max spindle 0 on a non-GRBL machine) there are no spindle commands, so run the drill by hand. Scale length and fret count start from the designer's values.
 
 ![Fret Template](docs/img/template.png)
 

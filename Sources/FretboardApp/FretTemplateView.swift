@@ -13,7 +13,8 @@ struct FretTemplateView: View {
     @State private var synced = false
 
     private var marks: [FretMark] { FretTemplate.positions(scaleLength: scaleLength, fretCount: fretCount) }
-    private var gcode: String { FretTemplate.gcode(scaleLength: scaleLength, marks: marks, settings: settings, safeZ: tp.settings.safeZ) }
+    private var gcode: String { FretTemplate.gcode(scaleLength: scaleLength, marks: marks, settings: settings, safeZ: tp.settings.safeZ,
+                                                          spindleRPM: tp.settings.spindleLimitRPM, spinUpSeconds: tp.settings.machine.spinUpSeconds) }
 
     var body: some View {
         VStack(spacing: 0) {

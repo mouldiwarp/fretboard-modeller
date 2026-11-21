@@ -1,7 +1,8 @@
 import Foundation
 
 /// Fret-slot jig template: marker holes drilled on the centre line at each fret position, measured from the nut.
-/// Ported from the standalone "Fret Template Builder" (GRBL-format G-code, no spindle commands).
+/// Ported from the standalone "Fret Template Builder" (GRBL-format G-code). Starts the spindle with M3 when the
+/// machine settings give a speed (always on a GRBL machine, which can't run its spindle by hand).
 public struct FretMark: Identifiable, Equatable {
     public let id: Int
     public let distanceFromNut: Double      // mm
@@ -31,7 +32,9 @@ public enum FretTemplate {
         return out
     }
 
-    public static func gcode(scaleLength: Double, marks: [FretMark], settings s: Settings, safeZ: Double) -> String {
+    /// `spindleRPM` 0 = the spindle is run by hand: no M3/M5.
+    public static func gcode(scaleLength: Double, marks: [FretMark], settings s: Settings, safeZ: Double,
+                             spindleRPM: Int = 0, spinUpSeconds: Int = 3) -> String {
         func c(_ t: String) -> String { s.commentStyle == .parentheses ? "(\(t))" : "; \(t)" }
         func f(_ v: Double) -> String { String(format: "%.3f", v) }
         var g = ""
@@ -40,6 +43,11 @@ public enum FretTemplate {
         g += c("Fret Count: \(marks.filter { $0.id >= 1 }.count)") + "\n"
         g += "\n"
         g += "G21\nG90\n"
+        if spindleRPM > 0 {
+            g += "G0 Z\(f(safeZ))\n"
+            g += "M3 S\(spindleRPM)\n"
+            g += "G4 P\(spinUpSeconds)\n"
+        }
         for m in marks {
             g += c("Fret \(m.id)") + "\n"
             g += "G0 Z\(f(safeZ))\n"
@@ -47,7 +55,9 @@ public enum FretTemplate {
             g += "G1 Z-\(f(s.plungeDepth)) F\(f(s.feed))\n"
             g += "G0 Z\(f(safeZ))\n"
         }
-        g += "G0 Z\(f(safeZ))\nM30\n"
+        g += "G0 Z\(f(safeZ))\n"
+        if spindleRPM > 0 { g += "M5\n" }
+        g += "M30\n"
         return g
     }
 }

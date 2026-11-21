@@ -336,6 +336,24 @@ func outlinePathIsCCWAndOffsetByTheCutterRadius(truss: Bool) {
     #expect(g.contains("(Fret 1)\nG0 Z5.000\nG0 X36.353 Y0.000\nG1 Z-6.000 F200.000"))
 }
 
+/// The fret template starts the spindle like the board toolpaths: on a GRBL machine (FoxAlien) a file without M3
+/// drills with the spindle off, so it always gets a speed there.
+@Test func fretTemplateStartsTheSpindle() {
+    var s = CNCSettings()
+    s.machine = .foxalien
+    s.maxSpindleRPM = 0
+    #expect(s.spindleLimitRPM == 24000)
+    let marks = FretTemplate.positions(scaleLength: 647.7, fretCount: 22)
+    let g = FretTemplate.gcode(scaleLength: 647.7, marks: marks, settings: .init(), safeZ: 5,
+                               spindleRPM: s.spindleLimitRPM, spinUpSeconds: s.machine.spinUpSeconds)
+    #expect(g.contains("G21\nG90\nG0 Z5.000\nM3 S24000\nG4 P5\n"))
+    // Spindle on before the first plunge, off after the last retract.
+    let lines = g.split(separator: "\n").map(String.init)
+    let m3 = lines.firstIndex(of: "M3 S24000")!, plunge = lines.firstIndex { $0.hasPrefix("G1 Z-") }!
+    #expect(m3 < plunge)
+    #expect(g.hasSuffix("G0 Z5.000\nM5\nM30\n"))
+}
+
 @Test func finishOutlinePlungesOneMillimetreClearAndClosesIn() {
     let (_, tp) = job()
     let fin = tp.moves.filter { $0.op == .finishOutline }

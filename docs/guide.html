@@ -88,7 +88,7 @@ code{font-family:Menlo,monospace;font-size:9pt;background:#f2f2f2;padding:0 1mm}
 <tr><td>Plunge depth</td><td>6 mm</td></tr>
 <tr><td>Feed</td><td>200 mm/min</td></tr>
 <tr><td>Comments</td><td>( ) or ; style</td></tr></table>
-<p>The table lists each fret's distance from the nut and spacing from the previous fret; the preview shows the G-code. <b>EXPORT G-CODE</b> saves <code>fret-slot-template-&lt;scale in&gt;-&lt;frets&gt;.nc</code>. The output is GRBL-style (ends with <code>M30</code>) and has no spindle commands, so run the drill by hand. Safe Z comes from the machine limits. Holes are at the fret centrelines; no blade-kerf offset is applied.</p>
+<p>The table lists each fret's distance from the nut and spacing from the previous fret; the preview shows the G-code. <b>EXPORT G-CODE</b> saves <code>fret-slot-template-&lt;scale in&gt;-&lt;frets&gt;.nc</code>. The output is GRBL-style (ends with <code>M30</code>) and starts the spindle (<code>M3 S…</code>, then a spin-up pause) at the machine limits' max spindle speed and stops it with <code>M5</code> at the end. With a manual spindle (max spindle 0 on a non-GRBL machine) it has no spindle commands, so run the drill by hand. Safe Z comes from the machine limits. Holes are at the fret centrelines; no blade-kerf offset is applied.</p>
 
 <h2>5. Building and testing</h2>
 <table><tr><td><code>./make_app.sh</code></td><td>Builds the release app and installs it to ~/Applications (Spotlight-launchable).</td></tr>
